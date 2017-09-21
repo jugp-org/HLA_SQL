@@ -9,7 +9,6 @@
 
     -- Прочитать файл    
     -- Exec hla_Alignments_Read @file_name='D:\NGS\DATA\alignments\A_gen.txt'
-    
     print '**************************************************'
     print 'Чтение данных alignments'
     print '**************************************************'
