@@ -41,6 +41,9 @@
 
     DBCC SHRINKFILE (N'DNA_HLA_log' , 0, TRUNCATEONLY)
     GO
+    
+    
+    
 
 */
 
