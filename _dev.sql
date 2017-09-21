@@ -58,11 +58,14 @@
  -- ****************************************************************************************************
  -- Экзоны
  -- ****************************************************************************************************
-    Select *
+    Select Substring(a.allele_name,1,Charindex('*',a.allele_name))
+            ,Substring(a.allele_name,1,Charindex(':',a.allele_name))
+            ,a.*
         From [dna_hla].[dbo].[hla_alleles] a
         Where 1=1
+        Order By a.allele_name
 --			and a.allele_name Like 'HLA-DRB1*%'
-			And a.release_confimed='confirmed' 
+			--And a.release_confimed='confirmed' 
 
     Select f.*
         From [dna_hla].[dbo].hla_features f with (NoLock) 
@@ -89,13 +92,29 @@
         Group By f.feature_name
                 ,f.feature_nucsequence
 
+    -- Список уникальных экзонов
     Select f.allele_id
+          ,a.allele_name
           ,f.alignmentreference_alleleid
           ,e.*
         From dna_hla..hla_uexon e With (Nolock)
-        Inner Join hla_features f With (Nolock)
-               On f.feature_nucsequence = e.uexon_seq
-        Order By f.alignmentreference_alleleid
+            Inner Join dna_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
+            Inner Join dna_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+        Where 1=1
+            and f.feature_name='Exon 2'
+        Order By a.allele_name,f.alignmentreference_alleleid
+
+    -- Кол-во уникальных экзонов по каждому типу гена
+    Select Substring(a.allele_name,1,Charindex(':',a.allele_name))
+            ,Count(*)
+        From dna_hla..hla_uexon e With (Nolock)
+            Inner Join dna_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
+            Inner Join dna_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+        Where 1=1
+            and f.feature_name='Exon 2'
+        Group by Substring(a.allele_name,1,Charindex(':',a.allele_name))
+        Order By Substring(a.allele_name,1,Charindex(':',a.allele_name))
+
 
     Select f.feature_name
           ,f.feature_nucsequence
@@ -247,15 +266,39 @@
 
 
 
-    -- ==================================================
+    -- **************************************************
 	-- hla_wreads_max таблица
-    -- ==================================================
+    -- **************************************************
 	Select count(*) from hla_wreads_max
 	Select top 1000 * 
         from hla_wreads_max
         Order By uexon_iid
     Select Distinct read_iid
         from hla_wreads_max
+
+    -- Список прямых ридов    
+    Select distinct
+            rm.read_iid
+        From hla_wreads_max rm
+            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+        Where 1=1
+            And ue.k_forward_back=1
+    -- Есть ли риды, похожие на прямые и обратные экзоны
+    ;With _cte_read As (
+        Select distinct
+                rm.read_iid
+            From hla_wreads_max rm
+                Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid 
+            Where 1=1
+                And ue.k_forward_back=1)
+    Select distinct
+            rm.read_iid
+        From hla_wreads_max rm
+            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid 
+        Where 1=1
+            And ue.k_forward_back=2
+            And rm.read_iid In (Select read_iid From _cte_read)
+
 
 	-- Уникальные гены и количество ридов для данного типа гена
     Select allele_id        = f.allele_id
@@ -275,8 +318,7 @@
         Group By a.allele_name,f.allele_id,ue.uexon_iid
         Order By a.allele_name,read_cnt Desc ,f.allele_id,ue.uexon_iid
 
-
-	-- Расчет расстоояния
+	-- Расчет расстояния
     Update hla_wreads_max
         Set seq_distance = dbo.sql_str_distance_cnt_from_point(wr.read_seq_x,ue.uexon_seq_x, rm.rpart_pos_1,rm.epart_pos_1)
         From hla_wreads_max rm
@@ -290,7 +332,7 @@
             And a.allele_name Like '%DQB%'
             And rm.uexon_iid In (1111000278,597)
         
-	-- Список ридов для уникальных экзонов по определенному гену
+	-- Расчет Diff
     Select   a.allele_name
             ,uexon_iid        = ue.uexon_iid
             ,rm.read_iid
@@ -313,24 +355,41 @@
             And rm.uexon_iid In (1111000278,597)
         Order By ue.uexon_iid,rm.read_iid
 
-    Select   uexon_iid        = ue.uexon_iid
+	-- Список ридов для уникальных экзонов по определенному гену
+    Select  f.feature_name
+            ,a.allele_name
+            ,uexon_iid        = ue.uexon_iid
             ,rm.read_iid
             ,rm.seq_distance
-            ,dbo.sql_str_distance_sdiff_from_point(wr.read_seq_x,ue.uexon_seq_x, rm.rpart_pos_1,rm.epart_pos_1)
-            ,rm.rpart_pos_1
-            ,rm.epart_pos_1
-            ,rm.eq_cnt
+            -- ,dbo.sql_str_distance_sdiff_from_point(wr.read_seq_x,ue.uexon_seq_x, rm.rpart_pos_1,rm.epart_pos_1)
             ,wr.read_seq_x 
             ,ue.uexon_seq_x
         From hla_wreads_max rm
             Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
             Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+            Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
+            Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
         Where 1=1
+            and ue.uexon_name='Exon 2'
+            And a.allele_name Like 'HLA-A*%'
             -- and ue.epart_cnt>20
-            And rm.uexon_iid In (1111000278,597)
+            -- And rm.uexon_iid In (1111000278,597)
         Order By ue.uexon_iid,rm.read_iid
 
-
+    -- Кол-во ридов, похожих на экзон 2 'HLA-A*%'
+    Select  Distinct
+            rm.read_iid
+            ,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+        From hla_wreads_max rm
+            -- Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
+            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+            Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
+            Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+        Where 1=1
+            and ue.uexon_name='Exon 4'
+            -- And a.allele_name Like '%DPB%'
+            -- And a.allele_name Like 'HLA-A*%'
+        Order By Substring(a.allele_name,1,Charindex('*',a.allele_name)), rm.read_iid
 
 	-- Уникальные гены и количество ридов для данного типа гена
     Select uexon_iid        = ue.uexon_iid
@@ -378,6 +437,9 @@
 
 
 
+    -- ==================================================
+    -- Анализ аллелей
+    -- ==================================================
     Declare @gen Varchar(20)
     Select @gen='%HLA-A*%'
     Select @gen='%HLA-B*%'
@@ -424,65 +486,6 @@
         Order By c2.allele_name
 
 
-
-    -- ==================================================
-	-- Cross таблица первых совпадющтх частей
-    -- ==================================================
-	If object_id('tempdb..#part_ex') Is Not null
-		Drop table #part_ex
-
-    Select 
-        wm.uexon_iid
-        ,rp.read_iid
-        -- ,rp.rpart_pos
-        ,epart_pos = min(ep.epart_pos)
-        -- ,rp.rpart_seq_x
-        Into #part_ex
-        From hla_wreads_max wm With (Nolock) 
-            Inner Join hla_reads_part rp With (Nolock) On wm.read_iid=rp.read_iid
-            Inner Join hla_uexon_part ep With (Nolock) On wm.uexon_iid=ep.uexon_iid and ep.epart_id=rp.rpart_id 
-        Group By wm.uexon_iid,rp.read_iid
-
-    Select count(*) From #part_ex
-    -- ==================================================
-    -- Записать результат в постоянную таблицу hla_part_cross_1
-    -- ==================================================
-    If Object_id('hla_part_cross_1') Is Not null
-         Drop table hla_part_cross_1
-
-    Select 
-            ep.uexon_iid
-            ,rp.read_iid
-            ,ep.epart_pos
-            ,rp.rpart_pos
-        Into hla_part_cross_1
-        From #part_ex t
-        Inner Join hla_uexon_part ep With (Nolock) On ep.uexon_iid=t.uexon_iid And ep.epart_pos=t.epart_pos
-        Inner Join hla_reads_part rp With (Nolock) On ep.epart_id=rp.rpart_id 
-
-    Select count(*) From hla_part_cross_1
-
-
-	Select top 100 * from hla_wreads_max
-
-	Select Count(*) From hla_texon_part
-	Select Count(*) From hla_tread_part
-
-	Select ep.*
-		,rp.rpart_pos
-		,rp.read_iid
-		,dif = rp.rpart_pos-ep.epart_pos
-	From hla_texon_part ep with (NoLock)
-		Inner Join hla_tread_part rp with (NoLock) On rp.wread_max_iid=ep.wread_max_iid and rp.rpart_id=ep.epart_id
-	Where 1=1
-        And rp.wread_max_iid=1
-		--and ep.uexon_iid In (2602,2603)
-		--And rp.read_iid=45
-	Order By rp.read_iid, ep.uexon_iid, rp.rpart_pos, ep.epart_pos		 
-	
-
-	Select * From hla_uexon Where uexon_iid=2602
-	Select * from hla_wreads Where read_iid=45
 /*
 
 
@@ -846,3 +849,5 @@ Select Top 1000 *
 Select Top 1000 *
     From hla_part_cross
 */
+
+
