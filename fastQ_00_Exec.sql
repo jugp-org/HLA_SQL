@@ -213,6 +213,59 @@
 		Drop table #part_ex
     Go
 
+    -- ==================================================
+	-- Обработать обраные риды
+    -- ==================================================
+    -- Список обратных ридов    
+	-- Перевернули
+    Update hla_wreads
+            Set read_seq_x = REVERSE(read_seq_x)
+               ,read_seq_e = REVERSE(read_seq_e)
+               ,k_forward_back = 2
+        From hla_wreads wr 
+        Inner Join hla_wreads_max rm With (Nolock) On rm.read_iid=wr.read_iid And rm.k_forward_back=2
+	-- Заменили на комплиментарную к исходной последовательности
+    -- для read_seq_e
+    -- A->0->T
+    -- T->3->A
+    -- C->1->G
+    -- G->2->C
+    -- для read_seq_x
+    -- Set uexon_seq_x	= Replace(Replace(Replace(Replace(uexon_seq,'A','0'),'C','1'),'G','2'),'T','3')
+    -- 0->А->3
+    -- 1->C->2
+    -- 2->G->1
+    -- 3->T->0
+    Update hla_wreads
+            Set read_seq_e	= Replace(Replace(Replace(Replace(Replace(Replace(Replace(Replace(read_seq_e,'A','0'),'T','3'),'C','1'),'G','2'),'0','T'),'3','A'),'1','G'),'2','C')
+               ,read_seq_x	= Replace(Replace(Replace(Replace(Replace(Replace(Replace(Replace(read_seq_e,'0','A'),'3','T'),'1','C'),'2','G'),'T','0'),'A','3'),'G','1'),'C','2')
+        From hla_wreads wr 
+        Inner Join hla_wreads_max rm With (Nolock) On rm.read_iid=wr.read_iid And rm.k_forward_back=2
+    -- Ид. прямого экзона
+    Update hla_wreads_max
+            Set uexon_iid = e.uexon_half_iid
+        From hla_wreads_max rm
+        Inner Join dna_hla.dbo.hla_uexon e With (Nolock) On e.uexon_iid=rm.uexon_iid
+        Where rm.k_forward_back=2
+    -- Позиции первого сопадения в экзоне
+    Update hla_wreads_max
+            Set epart_pos_1 = Len(e.uexon_seq_x)-epart_pos_1+1-12+1
+        From hla_wreads_max rm
+        Inner Join dna_hla.dbo.hla_uexon e With (Nolock) On e.uexon_iid=rm.uexon_iid
+        Where rm.k_forward_back=2
+    -- Позиции первого сопадения
+    Update hla_wreads_max
+            Set rpart_pos_1 = Len(wr.read_seq_x)-rpart_pos_1+1-12+1
+        From hla_wreads_max rm
+        Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
+        Where rm.k_forward_back=2
+
+    Go
+    DBCC SHRINKFILE (N'DNA_FASTQ_log' , 0, TRUNCATEONLY)
+    GO
+
+
+
 
 -- ****************************************************************************************************
 -- Выравнивание
