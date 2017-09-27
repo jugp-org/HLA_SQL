@@ -70,6 +70,7 @@
 
     -- Список экзонов
     Select a.allele_name
+            ,a.hla_g_group
             ,f.feature_name
             ,f.feature_nucsequence
             ,f.*
@@ -84,8 +85,9 @@
             --    (f.feature_name in ('Exon 2','Exon 3','Exon 4') And Substring(a.allele_name,1,5) In ('HLA-A','HLA-B','HLA-C'))
             --)
 			and f.[feature_status]='Complete'
---			and a.allele_name Like 'HLA-DRB1*%'
-			And a.release_confimed='confirmed' 
+			and a.allele_name Like 'HLA-DPB1*%'
+--			And a.release_confimed='confirmed' 
+--          And a.allele_name='HLA-DRB1*12:60N'
         Order by f.feature_name
                 ,a.allele_name
                 ,f.feature_nucsequence
@@ -108,13 +110,16 @@
     -- Список уникальных экзонов
     Select f.allele_id
           ,a.allele_name
-          ,f.alignmentreference_alleleid
+          ,e.uexon_len_x
+          -- ,f.alignmentreference_alleleid
           ,e.*
         From dna_hla..hla_uexon e With (Nolock)
             Inner Join dna_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
             Inner Join dna_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
         Where 1=1
             and f.feature_name='Exon 2'
+--            And a.allele_name Like '%DPB%'
+--            And a.allele_name Like 'HLA-A*%'
         Order By a.allele_name,f.alignmentreference_alleleid
 
     -- Кол-во уникальных экзонов по каждому типу гена
@@ -292,8 +297,6 @@
         Where ue.uexon_iid=278
         Order By ep.epart_pos
 
-
-
     -- **************************************************
 	-- hla_wreads_max таблица
     -- **************************************************
@@ -446,8 +449,8 @@
             Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
         Where 1=1
             -- and ue.uexon_name='Exon 3'
-            -- And a.allele_name Like '%DPB%'
-            And a.allele_name Like 'HLA-A*%'
+            And a.allele_name Like '%DPB%'
+            -- And a.allele_name Like 'HLA-A*%'
             -- And a.allele_name Like '%DPB%'
         Order By rm.read_iid,Substring(a.allele_name,1,Charindex('*',a.allele_name))
 
@@ -475,11 +478,32 @@
         Order By gen_name,uexon_name
 
 
-    -- **************************************************
+    -- Проверка кластеризации
+    -- выделим риды, одновременно похожие на разные экзоны или гены
+    ;With _cte_uread As (
+        Select  Distinct
+                rm.read_iid
+                ,gen_name=Substring(a.allele_name,1,Charindex('*',a.allele_name))
+                ,ue.uexon_name
+            From hla_wreads_max rm
+                -- Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
+                Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+                Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
+                Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+        )
+    Select *
+        From _cte_uread t1
+        Inner Join _cte_uread t2 On t1.read_iid=t2.read_iid And (t1.gen_name<>t2.gen_name Or t1.uexon_name<>t2.uexon_name)
+        Order By t1.uexon_name,t1.read_iid
+
+
+
+
+    -- ****************************************************************************************************
     -- Алгоритм выравнивания ридов
     -- Выбираем таблицу ридов по каждому гену и экзону
     -- Выбираем таблицу первых аллелей-экзонов для первых записей XXX*01:01:01. Только для тех, которые встретились в ридах
-    -- **************************************************
+    -- ****************************************************************************************************
     Declare @row_num2   Int
             ,@all_name  varchar(50)
             ,@exon_name varchar(50)
@@ -494,59 +518,9 @@
         drop Table #exon_read_lst
     If Object_id('tempdb..#alg_result') Is Not Null
         drop Table #alg_result
-/*
-    -- Список ридов для каждого гена и экзона из таблицы hla_wreads_max
-    Select Distinct rm.read_iid
-            ,exon_name  = ue.uexon_name
-            ,gen_name   = Substring(a.allele_name,1,Charindex('*',a.allele_name))
-        Into #read_gen_lst
-        From hla_wreads_max rm
-            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-            Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-            Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-        Where 1=1
-            And (a.allele_name Like 'HLA-A*%' 
-                Or a.allele_name Like 'HLA-B*%' 
-                Or a.allele_name Like 'HLA-C*%'
-                Or a.allele_name Like 'HLA-DPB1*%' 
-                Or a.allele_name Like 'HLA-DRB1*%' 
-                Or a.allele_name Like 'HLA-DQB1*%'
-            )
-*/
-/*
-    Select exon_name  
-          ,gen_name 
-          ,Count(*)  
-        From #read_gen_lst
-        Group By exon_name,gen_name   
-        Order By gen_name, exon_name   
-*/
-/*
-    -- Список аллелей и экзонов
-    --  с точностью до аллелей XXX*NN - Substring(a.allele_name,1,Charindex(':',a.allele_name))
-    --  с точностью до генов XXX*     - Substring(a.allele_name,1,Charindex('*',a.allele_name))
-    Select Distinct 
-             exon_name      = ue.uexon_name
-            ,allele_name_s  = Substring(a.allele_name,1,Charindex('*',a.allele_name))
-        Into #exon_read_lst2
-        From hla_wreads_max rm
-            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-            Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq 
-            Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-        Where 1=1
-            And (a.allele_name Like 'HLA-A*%' 
-                Or a.allele_name Like 'HLA-B*%' 
-                Or a.allele_name Like 'HLA-C*%'
-                Or a.allele_name Like 'HLA-DPB1*%' 
-                Or a.allele_name Like 'HLA-DRB1*%' 
-                Or a.allele_name Like 'HLA-DQB1*%'
-            )
-
-    --  Select * From #exon_read_lst2 Order By exon_name, allele_name_s
-*/
 
     Print '=================================================='
-    Print '*** Выравнивание ридов на первые аллели'
+    Print '*** Выравнивание ридов на первые аллели для каждого гена'
 
     -- Список аллелей для сравнения по экзонам
     --  с точностью до аллелей XXX*NN - Substring(a.allele_name,1,Charindex(':',a.allele_name))
@@ -580,6 +554,7 @@
 
     --Select * 
     --    From #exon_read_lst
+    -- 'HLA-DPB1*01:01:01:01'
 
     -- ==================================================
     -- Цикл по родительским экзонам
@@ -601,30 +576,22 @@
 
         -- Список ридов для данного экзона и гена
         ;With _cte_reads As (
-            Select wread_max_iid = Min(rm.wread_max_iid)
-                ,rm.read_iid
-                From (
-                    Select rm.read_iid
-                           ,epart_pos_1 = Min(rm.epart_pos_1)
-                        From hla_wreads_max rm
-                            Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
-                            Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                            Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-                            Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-                        Where 1=1
-                            And Substring(a.allele_name,1,Len(@all_name))=@all_name
-                            And f.feature_name=@exon_name
-                            --And Substring(a.allele_name,1,Len('HLA-A*'))='HLA-A*'
-                            --And f.feature_name='Exon 2'
-                        Group By rm.read_iid ) As t
-                Inner Join hla_wreads_max rm With (Nolock) On rm.read_iid=t.read_iid And rm.epart_pos_1=t.epart_pos_1
-                Group By rm.read_iid
+            Select Distinct rm.read_iid
+                From hla_wreads_max rm
+                    Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
+                    Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+                    Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
+                    Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+                Where 1=1
+                    And Substring(a.allele_name,1,Len(@all_name))=@all_name
+                    And f.feature_name=@exon_name
+                    --And Substring(a.allele_name,1,Len('HLA-A*'))='HLA-A*'
+                    --And f.feature_name='Exon 2'
             )
         Update hla_wreads
-                Set read_seq_diff = dbo.sql_str_distance_sdiff_from_point(wr.read_seq_e,@exon_seq,rm.rpart_pos_1,rm.epart_pos_1)
+                Set read_seq_diff = dbo.sql_str_rank_sdiff(wr.read_seq_e,@exon_seq)
             From hla_wreads wr With (Nolock)
-                Inner Join hla_wreads_max rm With (Nolock) On rm.read_iid=wr.read_iid
-                Inner Join _cte_reads t On t.wread_max_iid=rm.wread_max_iid
+            Inner Join _cte_reads t On t.read_iid=wr.read_iid
 
     	-- Продолжить цикл
         Select @row_num2=Min(row_num2)
@@ -641,7 +608,8 @@
                 Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
                 Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
             Where 1=1
-                And Substring(a.allele_name ,1 ,Len('HLA-A*')) = 'HLA-A*'
+                --And Substring(a.allele_name ,1 ,Len('HLA-A*')) = 'HLA-A*'
+                And a.allele_name Like '%DQB1%'
                 And ue.uexon_name='exon 2'
             Group By rm.read_iid 
         )
@@ -650,19 +618,33 @@
         Inner Join _cte_reads ce On ce.read_iid=wr.read_iid
         Order By wr.read_seq_diff 
 
-    -- ==================================================
-    -- Алгоритм
-    -- ==================================================
+
+    -- ====================================================================================================
+    -- Алгоритм усреднения
+    -- ====================================================================================================
     Declare @n1 Int
             ,@cnt_all   Numeric(7,2)
             ,@max_len   Int
             ,@level     Numeric(5,2)
+            ,@all_Like  Varchar(20)
+            ,@char_cnt  int
+            ,@char_val  varchar(1)
 
     Select @level=0.1
+    Select @all_Like='HLA-A*%'
+    -- Select @all_Like='%DRB1%'
     
     -- Временные таблицы
     If Object_id('tempdb..#res_diff') Is Not Null
         drop Table #res_diff
+    If Object_id('tempdb..#col_chars') Is Not Null
+        drop Table #col_chars
+    Create table #col_chars (
+        curr_char   Varchar(1)
+        ,char_cnt   int
+        ,char_rate  Numeric(7,2)
+    )
+
     ;With _cte_reads As (
         Select rm.read_iid
             From hla_wreads_max rm
@@ -671,8 +653,8 @@
                 Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
                 Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
             Where 1=1
-                And Substring(a.allele_name ,1 ,Len('HLA-A*')) = 'HLA-A*'
-                And ue.uexon_name='exon 2'
+                And a.allele_name Like @all_Like
+                And ue.uexon_name='exon 4'
             Group By rm.read_iid 
         )
     Select wr.*
@@ -687,7 +669,8 @@
     Select @cnt_all = Count(*) From #res_diff
     While @n1<=@max_len
     Begin
-
+/*
+        -- ver 1
         If @n1=-232
         Begin
 
@@ -720,21 +703,7 @@
                 Inner Join _cte_char ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
         End
 
-        -- Обработка вставок в шаблон
-        While Exists( Select 1
-                        From #res_diff
-                        Where Substring(read_seq_res_diff ,@n1,1)='^'   
-                            And Len(read_seq_res_diff)>=@n1
-                        Group By Substring(read_seq_res_diff ,@n1,1)
-                        Having Count(*)/@cnt_all<@level)
-        Begin
-            Update #res_diff
-                Set read_seq_res_diff=STUFF(read_seq_res_diff, @n1, 1, '')
-                From #res_diff t
-                Where Substring(t.read_seq_res_diff ,@n1,1)='^'
-                    And Len(read_seq_res_diff)>=@n1
-        End
-
+        -- ver 2
         ;With _cte_char As (
     	    Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
                     ,char_cnt   = Count(*)
@@ -750,7 +719,7 @@
                     , Case 
                         When ct.curr_char='^' Then ''
                         When ct.curr_char='.' And char_rate<@level Then '-'
-                        When ct.curr_char Not In ('.','^','-') And char_rate<@level Then '-'
+                        When ct.curr_char Not In ('.','^','-') And char_rate<@level Then '?'
                         Else ct.curr_char
                     End
                     )
@@ -758,28 +727,139 @@
             Inner Join _cte_char ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
             where Len(read_seq_res_diff)>=@n1
 
+*/
+        -- Обработка вставок в шаблон
+        While Exists( Select 1
+                        From #res_diff
+                        Where Substring(read_seq_res_diff ,@n1,1)='^'   
+                            And Len(read_seq_res_diff)>=@n1
+                        Group By Substring(read_seq_res_diff ,@n1,1)
+                        Having Count(*)/@cnt_all<@level)
+        Begin
+            Update #res_diff
+                Set read_seq_res_diff=STUFF(read_seq_res_diff, @n1, 1, '')
+                From #res_diff t
+                Where Substring(t.read_seq_res_diff ,@n1,1)='^'
+                    And Len(read_seq_res_diff)>=@n1
+        End
+
+        Delete from #col_chars
+        Insert #col_chars
+    	    Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
+                    ,char_cnt   = Count(*)
+                    ,char_rate  = Count(*)/@cnt_all
+                From #res_diff
+                Group By Substring(read_seq_res_diff,@n1,1)
+        Select @char_cnt=Count(*) 
+            From #col_chars
+            where char_rate>=@level
+        Select @char_val=curr_char
+            From #col_chars
+            where char_rate>=@level
+
+        Update #res_diff
+            Set read_seq_res_diff=STUFF(
+                      read_seq_res_diff
+                    , @n1
+                    , 1
+                    , Case 
+                        When ct.curr_char='^' Then ''
+                        When ct.curr_char='.' And char_rate<@level and @char_cnt=1 Then @char_val
+                        When ct.curr_char='.' And char_rate<@level and @char_cnt>1 Then '?'
+                        When ct.curr_char Not In ('.','^','-') and @char_cnt=1 and char_rate<@level Then @char_val
+                        When ct.curr_char Not In ('.','^','-') and @char_cnt>1 and char_rate<@level Then '?'
+                        Else ct.curr_char
+                    End
+                    )
+            From #res_diff t
+            Inner Join #col_chars ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
+            where Len(read_seq_res_diff)>=@n1
+
         Select @n1=@n1+1
     End
 
+    -- ==================================================
+    -- Обработка ?
+    -- ==================================================
+    Declare @seq_str    Varchar(Max)
+            ,@main_pos   Int
+            ,@beg_pos   Int
+            ,@end_pos   Int
+            ,@read_iid  Int
+            ,@mask      varchar(50)
+            ,@mask_val  varchar(50)
+            ,@mask_cnt  int
+
+    If Object_id('tempdb..#mask') Is Not Null
+        drop Table #mask
+    Create table #mask (
+        mask_val   Varchar(50)
+    )
+
+    While 1=1
+    Begin
+    	Select top 1 
+                @seq_str    = read_seq_res_diff
+                ,@main_pos  = Charindex('?',read_seq_res_diff)
+                ,@read_iid  = read_iid
+            From #res_diff
+            Where Charindex('?',read_seq_res_diff)>0
+        If @@rowcount=0 Break;
+
+        Select @beg_pos = 1
+        if @main_pos>6 Select @beg_pos=@main_pos-6
+        Select @mask=Replace(Substring(@seq_str,@beg_pos,13),'?','_')
+
+
+        Delete from #mask
+        Insert #mask
+            Select Substring(read_seq_res_diff,@beg_pos,13)
+                From #res_diff
+                Where Substring(read_seq_res_diff,@beg_pos,13) Like @mask
+                    and Charindex('?',Substring(read_seq_res_diff,@beg_pos,13))=0
+                Group By Substring(read_seq_res_diff,@beg_pos,13)
+        Select @mask_cnt=Count(*) From #mask 
+
+        -- Select @seq_str,@main_pos,@beg_pos,@mask,@mask_cnt
+
+        If @mask_cnt=1 
+        Begin
+            Select @mask_val=substring(mask_val,7,1) From #mask
+        	Update #res_diff
+                Set read_seq_res_diff = Stuff(read_seq_res_diff,@main_pos,1,@mask_val)
+                From #res_diff
+                Where Substring(read_seq_res_diff,@beg_pos,13) Like @mask
+                    and Substring(read_seq_res_diff,@main_pos,1)='?'
+        End
+        If @mask_cnt<>1 
+        Begin
+            Select @mask_val=mask_val From #mask
+        	Update #res_diff
+                Set read_seq_res_diff = Stuff(read_seq_res_diff,@main_pos,1,'$')
+                Where read_iid=@read_iid
+        End
+
+    End
+
+
     Select *
+         --,[02-01-01] = dbo.sql_str_rank_sdiff(read_seq_e,'AGAATTACCTTTTCCAGGGACGGCAGGAATGCTACGCGTTTAATGGGACACAGCGCTTCCTGGAGAGATACATCTACAACCGGGAGGAGTTCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGATGAGGAGTACTGGAACAGCCAGAAGGACATCCTGGAGGAGGAGCGGGCAGTGCCGGACAGGATGTGCAGACACAACTACGAGCTGGGCGGGCCCATGACCCTGCAGCGCCGAG')
+         --,[09-01-01] = dbo.sql_str_rank_sdiff(read_seq_e,'AGAATTACGTGCACCAGTTACGGCAGGAATGCTACGCGTTTAATGGGACACAGCGCTTCCTGGAGAGATACATCTACAACCGGGAGGAGTTCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGATGAGGACTACTGGAACAGCCAGAAGGACATCCTGGAGGAGGAGCGGGCAGTGCCGGACAGGGTATGCAGACACAACTACGAGCTGGACGAGGCCGTGACCCTGCAGCGCCGAG')
         From #res_diff
 
     
-    Select count(*),
-            read_seq_res_diff
+    Select count(*)
+            ,read_seq_res_diff
         From #res_diff
         Group By read_seq_res_diff
+        Order By Count(*)
 
   
 
 
-
-
-
-
-    -- **************************************************
+    -- ****************************************************************************************************
     -- *** Выравнивание экзонов в аллелях
-    -- **************************************************
+    -- ****************************************************************************************************
     -- ==================================================
     -- Цикл выравнивания
     -- ==================================================
@@ -837,7 +917,9 @@
         -- Select @all_name,@exon_name
         -- Список аллелей для каждого экзона , пронумерованных по порядку
         Update DNA_HLA.dbo.hla_features
-            Set feature_diff_all=dbo.sql_str_distance_sdiff_from_point(f.feature_nucsequence,@exon_seq,1,1)
+            Set 
+                -- feature_diff_all=dbo.sql_str_distance_sdiff_from_point(f.feature_nucsequence,@exon_seq,1,1)
+                feature_diff_all=dbo.sql_str_rank_sdiff(f.feature_nucsequence,@exon_seq)
             From DNA_HLA.dbo.hla_features f With (Nolock) 
                 Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
             Where 1=1
@@ -889,23 +971,6 @@
             -- And a.allele_name Like 'HLA-A*%'
         Order By rm.read_iid
 
-    -- Проверка кластеризации
-    -- выделим риды, одновременно похожие на разные экзоны или гены
-    ;With _cte_uread As (
-        Select  Distinct
-                rm.read_iid
-                ,gen_name=Substring(a.allele_name,1,Charindex('*',a.allele_name))
-                ,ue.uexon_name
-            From hla_wreads_max rm
-                -- Inner Join hla_wreads wr With (Nolock) On wr.read_iid=rm.read_iid
-                Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                Inner Join DNA_HLA.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-                Inner Join DNA_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-        )
-    Select *
-        From _cte_uread t1
-        Inner Join _cte_uread t2 On t1.read_iid=t2.read_iid And (t1.gen_name<>t2.gen_name Or t1.uexon_name<>t2.uexon_name)
-        Order By t1.uexon_name,t1.read_iid
 
 
 	-- Количество совпавших ридов с каждым экзоном

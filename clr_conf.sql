@@ -55,7 +55,6 @@ Create Function sql_str_distance_sdiff_from_point
 Returns Nvarchar(Max)
 As External Name mssql_dna.[mssql_dna.sequence_lib].sql_str_distance_sdiff_from_point
 
-
 Create Procedure sql_str_distance_from_point
 (
      @inp_str      Nvarchar(Max)
@@ -69,6 +68,15 @@ Create Procedure sql_str_distance_from_point
 )
 As External Name mssql_dna.[mssql_dna.sequence_lib].sql_str_distance_from_point
 
+Create Function sql_str_rank_sdiff
+(
+     @inp_str      Nvarchar(Max)
+    ,@tag_str      Nvarchar(Max)
+)
+Returns Nvarchar(Max)
+As External Name mssql_dna.[mssql_dna.sequence_lib].sql_str_rank_sdiff
+
+
 -- **************************************************
 -- 
 -- **************************************************
@@ -80,7 +88,9 @@ Go
 -- test
 -- **************************************************
 Select top 10000
-        dbo.sql_str_distance_cnt_from_point(wr.read_seq_x,ue.uexon_seq_x, wm.rpart_pos_1,wm.epart_pos_1)
+        wr.read_seq_x
+        ,ue.uexon_seq_x
+        ,dbo.sql_str_distance_sdiff_from_point(wr.read_seq_x,ue.uexon_seq_x, wm.rpart_pos_1,wm.epart_pos_1)
         --,wm.*
         --,wr.read_seq_x
         --,ue.uexon_seq_x
@@ -89,7 +99,23 @@ Select top 10000
     From hla_wreads_max wm With (Nolock)
     Inner Join hla_wreads wr With (Nolock) On wr.read_iid=wm.read_iid
     Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=wm.uexon_iid
+    order by wm.wread_max_iid
 
+Select top 10000
+        wr.read_seq_x
+        ,ue.uexon_seq_x
+        ,dbo.sql_str_rank_sdiff(wr.read_seq_x,ue.uexon_seq_x)
+        --,wm.*
+        --,wr.read_seq_x
+        --,ue.uexon_seq_x
+        --,wm.rpart_pos_1
+        --,wm.epart_pos_1
+    From hla_wreads_max wm With (Nolock)
+    Inner Join hla_wreads wr With (Nolock) On wr.read_iid=wm.read_iid
+    Inner Join DNA_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=wm.uexon_iid
+    order by wm.wread_max_iid
+
+Select 10000/46
 
 Select top 10
         dbo.sql_str_distance_cnt_from_point(wr.read_seq_x,ue.uexon_seq_x, wm.rpart_pos_1,wm.epart_pos_1)
