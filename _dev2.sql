@@ -167,9 +167,14 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 	    From dna2_hla.dbo.hla_uexon e
 	    Where  1 = 1
 	           --and e.uexon_half_iid=1
-	           and e.k_forward_back=1
+	           --and e.k_forward_back=1
 	           --and e.uexon_iid=17257
-               And e.uexon_len=293
+               --And e.uexon_len=293
+               --And (
+               --     (e.uexon_num In (2,3,4) And e.gen_cd In ('A','B','C')) 
+               --     Or 
+               --     (e.uexon_num In (2) And e.gen_cd In ('DRB1','DQB1','DPB1'))
+               -- )
 	    Order By e.gen_cd
                 ,e.uexon_num
                 ,e.uexon_half_iid
