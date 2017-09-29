@@ -31,7 +31,9 @@ Begin
     Print '=================================================='
     Print '*** Выравнивание экзонов в аллелях'
     Truncate Table [hla_fexon_align]
-    
+
+/*
+    -- ВЫРАВНИВАНИЕ С УЧЕТОМ ДЛИНЫ!!!
     -- Список первых аллелей для каждого экзона заданной длины, на которые будем потом выравнивать 
     Insert [hla_fexon_align] (
 	    [allele_id]
@@ -74,9 +76,52 @@ Begin
         Order By t.gen_cd,t.allele_name,t.exon_num, t.exon_len
 
     -- Select * From [hla_fexon_align]
+*/
+
+    -- Список первых аллелей для каждого экзона, на которые будем потом выравнивать 
+    Insert [hla_fexon_align] (
+	    [allele_id]
+	   ,[allele_name]
+       ,[gen_cd]
+	   ,[exon_num]
+	   ,[exon_seq]
+       ,[uexon_iid]
+    )
+    Select t.allele_id
+            ,t.allele_name
+            ,t.gen_cd
+	        ,t.exon_num
+	        ,t.exon_seq
+            ,ue.uexon_iid
+        From (
+            -- Список аллелей для каждого экзона, пронумерованных по порядку
+            Select a.allele_name
+                    ,allele_id      = a.allele_id
+                    ,gen_cd         = Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
+                    ,exon_num       = Cast(Replace(f.feature_name,'Exon','') As Numeric(2))
+                    ,exon_seq       = f.feature_nucsequence
+                    ,exon_len       = f.feature_len
+                    ,row_num        = Row_number() Over(Partition By f.feature_name,Substring(a.allele_name,1,Charindex('*',a.allele_name)) Order By f.feature_name,a.allele_name) 
+                From dna2_hla.dbo.hla_features f With (Nolock) 
+                    Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+                Where 1=1
+                    And f.[feature_status]='Complete'
+                    And f.feature_type='Exon'
+                    And (
+                        (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
+                        Or 
+                        (f.feature_name ='Exon 2' And (a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%'))
+                    )
+                -- Order By f.feature_name,a.allele_name
+                ) As t
+        Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
+        Where t.row_num=1
+        Order By t.gen_cd,t.allele_name,t.exon_num
+-- Select * From [hla_fexon_align] order by gen_cd,exon_num
+
 
     -- ==================================================
-    -- Цикл по родительтским экзонам
+    -- Цикл по родительским экзонам
     -- ==================================================
     Select @fexon_iid=Min(fexon_iid)
         From [hla_fexon_align]
@@ -102,7 +147,6 @@ Begin
                 And ue.k_forward_back   = 1
                 And ue.gen_cd           = @gen_cd
                 And ue.uexon_num        = @exon_num
-                And ue.uexon_len        = @exon_len
 
     	-- Продолжить цикл
         Select @fexon_iid=Min(fexon_iid)
@@ -111,17 +155,5 @@ Begin
         -- Break
     End
     		
-    Select ue.*
-        From dna2_hla.dbo.hla_uexon ue
-        Where 1=1
-            and ue.k_forward_back   = 1
-            And Isnull(uexon_diff_seq,'')<>''
-        Order By ue.gen_cd
-            ,ue.uexon_num
-            ,ue.uexon_len
-            ,ue.uexon_seq
-
-
-
 
 End

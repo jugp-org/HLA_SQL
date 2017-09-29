@@ -210,6 +210,24 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             ,Len(e.uexon_seq)
 
 
+    -- Выравнивание экзонов
+    Select *
+        From hla_fexon_align
+
+    Select ue.*
+            ,ea.exon_seq
+        From dna2_hla.dbo.hla_uexon ue
+        Inner Join hla_fexon_align ea With (Nolock) On ea.gen_cd=ue.gen_cd And ea.exon_num=ue.uexon_num
+        Where 1=1
+            and ue.k_forward_back   = 1
+            And Isnull(uexon_diff_seq,'')<>''
+            and ue.gen_cd='A'
+            and ue.uexon_num=2
+        Order By ue.gen_cd
+            ,ue.uexon_num
+            ,ue.uexon_seq
+
+
     -- Список частей экзонов
     Select ep.*
             ,ue.uexon_seq
