@@ -538,18 +538,21 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     ;With _cte_uread As (
         Select  Distinct
                 rm.read_iid
-                ,gen_name=Substring(a.allele_name,1,Charindex('*',a.allele_name))
-                ,ue.uexon_name
+                ,ue.gen_cd
+                ,ue.uexon_num
             From hla_join_max rm
-                -- Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
                 Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-                Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+            Where (
+                    (ue.gen_cd In ('A','B','C') and ue.uexon_num In (2,3,4)
+                    Or 
+                    (ue.gen_cd In ('DRB1','DQB1','DPB1') and ue.uexon_num In (2))
+                    )
+                  )
         )
     Select *
         From _cte_uread t1
-        Inner Join _cte_uread t2 On t1.read_iid=t2.read_iid And (t1.gen_name<>t2.gen_name Or t1.uexon_name<>t2.uexon_name)
-        Order By t1.uexon_name,t1.read_iid
+        Inner Join _cte_uread t2 On t1.read_iid=t2.read_iid And (t1.gen_cd<>t2.gen_cd Or t1.uexon_num<>t2.uexon_num)
+        Order By t1.gen_cd,t1.uexon_num,t1.read_iid
 
 
     -- ****************************************************************************************************
@@ -557,16 +560,26 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     -- Выбираем таблицу ридов по каждому гену и экзону
     -- Выбираем таблицу первых аллелей-экзонов для первых записей XXX*01:01:01. Только для тех, которые встретились в ридах
     -- ****************************************************************************************************
+    Declare @row_num2       Int
+            ,@all_name      varchar(50)
+            ,@exon_name     varchar(50)
+            ,@exon_num      Int
+            ,@gen_cd        Varchar(20)
+            ,@exon_seq      Varchar(Max)
+            ,@fexon_iid     Int
+            ,@exon_len      Int
+
     -- Таблица результата
-
-    
-    Declare @row_num2   Int
-            ,@all_name  varchar(50)
-            ,@exon_name varchar(50)
-            ,@exon_num  Int
-            ,@gen_cd    Varchar(20)
-            ,@exon_seq  Varchar(Max)
-
+    If Object_id('hla_reads_align') Is Not null
+        Drop table hla_reads_align
+    Create Table [dbo].hla_reads_align
+    (
+	    [ralign_iid]					numeric(15) Not Null Identity (1,1)
+	   ,[read_iid]				        Int
+       ,[gen_cd]                        varchar(10)             -- код гена HLA-A*, HLA-B*, HLA-C* ... 
+	   ,[uexon_num]	    				numeric(2)              -- Номер экзона
+       ,[read_diff_seq]                 varchar(max)    Null    -- 
+    )
 
     -- Временные таблицы
     If Object_id('tempdb..#read_gen_lst') Is Not Null
@@ -581,76 +594,43 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     Print '=================================================='
     Print '*** Выравнивание ридов на первые аллели для каждого гена'
 
-    -- Список аллелей для сравнения по экзонам
-    --  с точностью до аллелей XXX*NN - Substring(a.allele_name,1,Charindex(':',a.allele_name))
-    --  с точностью до генов XXX*     - Substring(a.allele_name,1,Charindex('*',a.allele_name))
-    -- Получим табличку вида
-    /*
-            HLA-A*01:01:01:01
-            HLA-A*01:01:01:01
-            HLA-A*01:01:01:01
-            HLA-B*07:02:01:01
-            HLA-B*07:02:01:01
-            HLA-B*07:02:01:01
-            HLA-C*01:02:01:01
-            HLA-C*01:02:01:01
-            HLA-C*01:02:01:01
-            HLA-DPB1*01:01:01:01
-            HLA-DQB1*02:01:01
-            HLA-DRB1*01:01:01
-    */
-    Select t.*
-           ,ue.uexon_seq
-           ,row_num2 = Row_number() Over(order By t.allele_name,t.exon_name)
-        Into #exon_read_lst
-        From (
-            -- Список аллелей для каждого экзона, пронумерованных по порядку
-            Select a.allele_name
-                    ,allele_id      = a.allele_id
-                    ,allele_name_s  = Substring(a.allele_name,1,Charindex('*',a.allele_name))
-                    ,exon_name      = f.feature_name
-                    ,exon_num       = cast(Replace(f.feature_name,'Exon','') As Numeric(2))
-                    ,gen_cd         = Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
-                    ,exon_seq       = f.feature_nucsequence
-                    ,row_num        = Row_number() Over(Partition By f.feature_name,Substring(a.allele_name,1,Charindex('*',a.allele_name)) Order By f.feature_name,a.allele_name) 
-                From dna2_hla.dbo.hla_features f With (Nolock) 
-                    Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-                Where 1=1
-                    And f.[feature_status]='Complete'
-                    And f.feature_type='Exon'
-                    And (
-                        (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
-                        Or 
-                        (f.feature_name ='Exon 2' And (a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%'))
-                    )
-                ) As t
-        Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
-        Where t.row_num=1
-    Order By t.allele_name,t.exon_name
-
-    Select * 
-        From #exon_read_lst
-    -- 'HLA-DPB1*01:01:01:01'
-
     -- ==================================================
     -- Цикл по родительским экзонам
     -- ==================================================
-    Select @row_num2=Min(row_num2)
-        From #exon_read_lst
-    While Isnull(@row_num2,0)<>0
+    -- Select * From [hla_fexon_align]
+    Select @fexon_iid=Min(fexon_iid)
+        From [hla_fexon_align]
+
+    While Isnull(@fexon_iid,0)<>0
     Begin
-        Select @all_name    = t.allele_name_s
-              ,@exon_name   = t.exon_name
+        Select @all_name    = t.allele_name
+              ,@exon_num    = t.exon_num
               ,@exon_seq    = t.exon_seq
               ,@gen_cd      = t.gen_cd
-              ,@exon_num    = t.exon_num
-            From #exon_read_lst t
-            Where row_num2=@row_num2
+              ,@exon_len    = t.exon_len
+            From [hla_fexon_align] t
+            Where fexon_iid=@fexon_iid
+
 
         Print '=================================================='
         Print '*** Выравнивание '+@all_name+' '+@exon_name+' '+@exon_seq
 
         -- Список ридов для данного экзона и гена
+        Insert hla_reads_align (
+	            [read_iid]				        
+               ,[gen_cd] 
+	           ,[uexon_num]	  )
+            Select Distinct 
+                    rm.read_iid
+                    ,@gen_cd
+                    , @exon_num
+                From hla_join_max rm
+                    Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
+                    Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+                Where 1=1
+                    And ue.gen_cd       = @gen_cd
+                    And ue.uexon_num    = @exon_num
+
         ;With _cte_reads As (
             Select Distinct rm.read_iid
                 From hla_join_max rm
@@ -666,9 +646,9 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             Inner Join _cte_reads t On t.read_iid=wr.read_iid
 
     	-- Продолжить цикл
-        Select @row_num2=Min(row_num2)
-            From #exon_read_lst
-            Where row_num2>@row_num2
+        Select @fexon_iid=Min(fexon_iid)
+            From [hla_fexon_align]
+            Where fexon_iid>@fexon_iid
         -- Break
     End
 
@@ -677,12 +657,10 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             From hla_join_max rm
                 Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
                 Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-                Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
             Where 1=1
                 --And Substring(a.allele_name ,1 ,Len('HLA-A*')) = 'HLA-A*'
-                And a.allele_name Like '%DQB1%'
-                And ue.uexon_name='exon 2'
+                And ue.gen_cd='DQB1'
+                And ue.uexon_num=2
             Group By rm.read_iid 
         )
     Select *
@@ -929,99 +907,16 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
   
 
 
-    -- ****************************************************************************************************
-    -- *** Выравнивание экзонов в аллелях
-    -- ****************************************************************************************************
-    -- ==================================================
-    -- Цикл выравнивания
-    -- ==================================================
-    Declare @row_num2   Int
-            ,@all_name  varchar(50)
-            ,@exon_name varchar(50)
-            ,@exon_seq  Varchar(Max)
 
-    Print '=================================================='
-    Print '*** Выравнивание экзонов в аллелях'
-    If Object_id('tempdb..#exon_lst') Is Not Null
-        drop Table #exon_lst
-    -- Список первых аллелей , на которые будем потом выравнивать 
-    Select t.*
-           ,ue.uexon_seq
-           ,row_num2 = Row_number() Over(order By t.allele_name,t.exon_name)
-        Into #exon_lst
-        From (
-            -- Список аллелей для каждого экзона , пронумерованных по порядку
-            Select a.allele_name
-                    ,allele_id      = a.allele_id
-                    ,allele_name_s  = Substring(a.allele_name,1,Charindex('*',a.allele_name))
-                    ,exon_name      = f.feature_name
-                    ,exon_seq       = f.feature_nucsequence
-                    ,row_num        = Row_number() Over(Partition By f.feature_name,Substring(a.allele_name,1,Charindex('*',a.allele_name)) Order By f.feature_name,a.allele_name) 
-                From dna2_hla.dbo.hla_features f With (Nolock) 
-                    Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-                Where 1=1
-                    And f.[feature_status]='Complete'
-                    And f.feature_type='Exon'
-                    And (
-                        (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
-                        Or 
-                        (f.feature_name ='Exon 2' And (a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%'))
-                    )
-                ) As t
-        Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
-        Where t.row_num=1
-    Order By t.allele_name,t.exon_name
 
-    -- Select * from #exon_lst
 
-    -- Цикл по родительтским экзонам
-    Select @row_num2=Min(row_num2)
-        From #exon_lst
-    While Isnull(@row_num2,0)<>0
-    Begin
-        Select @all_name    = t.allele_name_s
-              ,@exon_name   = t.exon_name
-              ,@exon_seq    = t.exon_seq
-            From #exon_lst t
-            Where row_num2=@row_num2
-            
-        Print '*** Обработка:'+@all_name+' '+@exon_name
-        -- Select @all_name,@exon_name
-        -- Список аллелей для каждого экзона , пронумерованных по порядку
-        Update dna2_hla.dbo.hla_features
-            Set 
-                -- feature_diff_all=dbo.sql_str_distance_sdiff_from_point(f.feature_nucsequence,@exon_seq,1,1)
-                feature_diff_all=dbo.sql_str_rank_sdiff(f.feature_nucsequence,@exon_seq)
-            From dna2_hla.dbo.hla_features f With (Nolock) 
-                Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-            Where 1=1
-                And Substring(a.allele_name,1,Len(@all_name)) = @all_name
-                And f.[feature_status]='Complete'
-                And f.feature_type='Exon'
-                And f.feature_name = @exon_name
 
-    	-- Продолжить цикл
-        Select @row_num2=Min(row_num2)
-            From #exon_lst
-            Where row_num2>@row_num2
-        -- Break
-    End
-    		
-    Select a.allele_name
-          ,a.release_confimed
-          ,f.feature_name
-          ,f.feature_nucsequence
-          ,f.feature_diff_all
-          ,f.*
-        From dna2_hla.dbo.hla_features f
-        Inner Join dna2_hla.dbo.hla_alleles a With (Nolock)
-               On a.allele_id = f.allele_id
-        Where  1 = 1
-               And f.[feature_status] = 'Complete'
-               And f.feature_type = 'Exon'
-               And ( ( f.feature_name In ('Exon 2' ,'Exon 3' ,'Exon 4') And ( a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%' ) ) Or ( f.feature_name=
-                       'Exon 2' And ( a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%' ) ) )
-        Order By f.feature_name, a.allele_name
+
+
+
+
+
+
 
 
 
