@@ -580,6 +580,8 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 	   ,[uexon_num]	    				numeric(2)              -- Номер экзона
        ,[read_diff_seq]                 varchar(max)    Null    -- 
     )
+    Create Nonclustered Index [hla_reads_align_idx1] On [dbo].[hla_reads_align](gen_cd,uexon_num)
+    Create Nonclustered Index [hla_reads_align_idx2] On [dbo].[hla_reads_align](read_iid,gen_cd,uexon_num)
 
     -- Временные таблицы
     If Object_id('tempdb..#read_gen_lst') Is Not Null
@@ -599,7 +601,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     -- ==================================================
     -- Select * From [hla_fexon_align]
     Select @fexon_iid=Min(fexon_iid)
-        From [hla_fexon_align]
+        From dna2_hla.dbo.hla_fexon_align
 
     While Isnull(@fexon_iid,0)<>0
     Begin
@@ -608,12 +610,12 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
               ,@exon_seq    = t.exon_seq
               ,@gen_cd      = t.gen_cd
               ,@exon_len    = t.exon_len
-            From [hla_fexon_align] t
+            From dna2_hla.dbo.[hla_fexon_align] t
             Where fexon_iid=@fexon_iid
 
 
         Print '=================================================='
-        Print '*** Выравнивание '+@all_name+' '+@exon_name+' '+@exon_seq
+        Print '*** Выравнивание all_name='+@all_name+' exon_num='+cast(@exon_num As Varchar(2))+' exon_seq='+@exon_seq
 
         -- Список ридов для данного экзона и гена
         Insert hla_reads_align (
@@ -622,7 +624,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 	           ,[uexon_num]	  )
             Select Distinct 
                     rm.read_iid
-                    ,@gen_cd
+                    , @gen_cd
                     , @exon_num
                 From hla_join_max rm
                     Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
@@ -631,43 +633,40 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                     And ue.gen_cd       = @gen_cd
                     And ue.uexon_num    = @exon_num
 
-        ;With _cte_reads As (
-            Select Distinct rm.read_iid
-                From hla_join_max rm
-                    Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
-                    Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                Where 1=1
-                    And ue.gen_cd       = @gen_cd
-                    And ue.uexon_num    = @exon_num
-            )
-        Update hla_reads
-                Set read_seq_diff = dbo.sql_str_rank_sdiff(wr.read_seq_e,@exon_seq)
-            From hla_reads wr With (Nolock)
-            Inner Join _cte_reads t On t.read_iid=wr.read_iid
+        Update hla_reads_align
+        	Set [read_diff_seq] = dbo.sql_str_rank_sdiff(wr.read_seq ,@exon_seq)
+        	From hla_reads wr With (Nolock)
+            Inner Join hla_reads_align ra With (Nolock)  
+                On ra.read_iid = wr.read_iid  
+                And ra.gen_cd = @gen_cd  
+                And ra.uexon_num = @exon_num
 
     	-- Продолжить цикл
         Select @fexon_iid=Min(fexon_iid)
-            From [hla_fexon_align]
+            From dna2_hla.dbo.[hla_fexon_align]
             Where fexon_iid>@fexon_iid
-        -- Break
+
     End
 
-    ;With _cte_reads As (
-        Select rm.read_iid
-            From hla_join_max rm
-                Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
-                Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-            Where 1=1
-                --And Substring(a.allele_name ,1 ,Len('HLA-A*')) = 'HLA-A*'
-                And ue.gen_cd='DQB1'
-                And ue.uexon_num=2
-            Group By rm.read_iid 
-        )
     Select *
-        From hla_reads wr With (Nolock)
-        Inner Join _cte_reads ce On ce.read_iid=wr.read_iid
-        Order By wr.read_seq_diff 
+        From hla_reads_align ra With (Nolock)
+        Where ra.gen_cd='DQB1'
+        Order By ra.read_diff_seq 
 
+    Select Count(*)
+        From hla_reads_align ra With (Nolock)
+        Where ra.gen_cd='DQB1'
+
+    Select Count(*)
+            ,substring(ra.read_diff_seq ,1,278)
+        From hla_reads_align ra With (Nolock)
+        Where ra.gen_cd='DQB1'
+        Group by substring(ra.read_diff_seq ,1,278)
+        Order By Count(*),substring(ra.read_diff_seq ,1,278)
+
+    Select *
+        From dna2_hla.dbo.hla_uexon ue
+        Where ue.uexon_diff_seq Like '-------------------------------------------------G-------------------C----T-.---------------G---.-A--CA----------------------T--A-.-------------C--------C---------------------------------.-G------------CC-------A-T------C-----------------------------------------------------%'
 
     -- ====================================================================================================
     -- Алгоритм усреднения
