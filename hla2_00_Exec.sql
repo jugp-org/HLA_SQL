@@ -30,4 +30,7 @@ Go
     -- ==================================================
     Exec [hla2_Exon_Align]
     Go
+
+    DBCC SHRINKFILE (N'DNA2_HLA_log' , 0, TRUNCATEONLY)
+    GO
     

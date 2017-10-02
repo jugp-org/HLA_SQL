@@ -167,7 +167,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 	    From dna2_hla.dbo.hla_uexon e
 	    Where  1 = 1
 	           --and e.uexon_half_iid=1
-	           --and e.k_forward_back=1
+	           -- and e.k_forward_back=2
 	           --and e.uexon_iid=17257
                --And e.uexon_len=293
                --And (
@@ -648,22 +648,31 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 
     End
 
+    -- ==================================================
+    -- Список ридов
+    -- ==================================================
     Select *
         From hla_reads_align ra With (Nolock)
         Where ra.gen_cd='DQB1'
         And ra.uexon_num=2
         Order By ra.read_diff_seq 
 
-    Select Count(*)
+	-- Кол-во ридов по генам и экзонам
+    Select ra.gen_cd, ra.uexon_num,  Count(*)
         From hla_reads_align ra With (Nolock)
-        Where ra.gen_cd='DQB1'
+        Group by ra.gen_cd, ra.uexon_num
+		Order by gen_cd, ra.uexon_num
 
-   Select Count(*)
-            ,ra.read_diff_seq 
-        From hla_reads_align ra With (Nolock)
-        Where ra.gen_cd='DQB1'
-        Group by ra.read_diff_seq 
-        Order By Count(*),ra.read_diff_seq 
+    -- ==================================================
+	-- Распределение уникальных ридов в пределах экзона, гена	
+    -- ==================================================
+	Select Count(*)
+			,ra.read_diff_seq 
+		From hla_reads_align ra With (Nolock)
+		Where ra.gen_cd='DQB1'
+			And ra.uexon_num=2
+		Group by ra.read_diff_seq 
+		Order By Count(*),ra.read_diff_seq 
 
     Select Count(*)
             ,substring(ra.read_diff_seq ,1,270)
@@ -672,10 +681,16 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Group by substring(ra.read_diff_seq ,1,270)
         Order By Count(*),substring(ra.read_diff_seq ,1,270)
 
+
+    -- ==================================================
+	-- Количество точных совпадений DIFF
+	-- Для одного экзона
+    -- ==================================================
     Select Count(*)
             ,ue.gen_cd
             ,ue.uexon_num
             ,a.allele_name
+            ,a.hla_g_group
             ,f.feature_name
             ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
         From dna2_hla.dbo.hla_uexon ue
@@ -685,30 +700,109 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                 On ra.gen_cd=ue.gen_cd  
                     and ra.uexon_num=ue.uexon_num
                     and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
-        Where ue.uexon_diff_seq Like '--------------------------C----------------------G-----------GGG-----C----c-.---------------G---.-a--------------------------T--a------A-------C--A-----G-----TT--------------------------.-g--------G--GCC------T-----------------------------G--G---C-.-a----GG--t--.-----A-%'
+        Where 1=1
+			-- and ue.uexon_diff_seq Like '--------------------------C----------------------G-----------GGG-----C----c-.---------------G---.-a--------------------------T--a------A-------C--A-----G-----TT--------------------------.-g--------G--GCC------T-----------------------------G--G---C-.-a----GG--t--.-----A-%'
+			and ra.gen_cd='C'
+			And ra.uexon_num=2
+			And a.allele_name Like 'HLA-C%'
         Group by ue.gen_cd
                 ,ue.uexon_num
+                ,a.hla_g_group
                 ,a.allele_name
                 ,f.feature_name
                 ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
         Order By ue.gen_cd
                 ,ue.uexon_num
+                ,a.hla_g_group
                 ,a.allele_name
                 ,f.feature_name
                 ,Count(*)
                 ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
 
-    Select a.allele_name
-            ,a.hla_g_group
-            ,f.*
-        From dna2_hla.dbo.hla_uexon ue
-            Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
-            Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
-        Where a.allele_name In ('HLA-DPB1*352:01','HLA-DPB1*414:01')
 
-    -- ====================================================================================================
+    -- ==================================================
+	-- Количество точных совпадений DIFF
+	-- Для одного гена
+    -- ==================================================
+    Declare 
+		@gen_cd	Varchar(10)
+	Select @gen_cd='C'
+	    		 
+    ;with _cte_2 As (Select
+						 ue.gen_cd
+						,ue.uexon_num
+						,a.allele_name
+						,a.hla_g_group
+					From dna2_hla.dbo.hla_uexon ue
+					Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
+					Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
+					Inner Join hla_reads_align ra With (Nolock) 
+							On ra.gen_cd=ue.gen_cd  
+								and ra.uexon_num=ue.uexon_num
+								and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
+					Where 1=1
+						and ra.gen_cd=@gen_cd
+						And ra.uexon_num=2
+						And a.allele_name Like 'HLA-'+@gen_cd+'%'
+					Group By ue.gen_cd,ue.uexon_num,a.allele_name,a.hla_g_group
+					Having Count(*)>10
+		) 							
+		,_cte_3 As (Select
+						 ue.gen_cd
+						,ue.uexon_num
+						,a.allele_name
+						,a.hla_g_group
+					From dna2_hla.dbo.hla_uexon ue
+					Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
+					Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
+					Inner Join hla_reads_align ra With (Nolock) 
+							On ra.gen_cd=ue.gen_cd  
+								and ra.uexon_num=ue.uexon_num
+								and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
+					Where 1=1
+						and ra.gen_cd=@gen_cd
+						And ra.uexon_num=3
+						And a.allele_name Like 'HLA-'+@gen_cd+'%'
+					Group By ue.gen_cd,ue.uexon_num,a.allele_name,a.hla_g_group
+					Having Count(*)>10
+		)
+		,_cte_4 As (Select
+						 ue.gen_cd
+						,ue.uexon_num
+						,a.allele_name
+						,a.hla_g_group
+					From dna2_hla.dbo.hla_uexon ue
+					Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
+					Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
+					Inner Join hla_reads_align ra With (Nolock) 
+							On ra.gen_cd=ue.gen_cd  
+								and ra.uexon_num=ue.uexon_num
+								and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
+					Where 1=1
+						and ra.gen_cd=@gen_cd
+						And ra.uexon_num=4
+						And a.allele_name Like 'HLA-'+@gen_cd+'%'
+					Group By ue.gen_cd,ue.uexon_num,a.allele_name,a.hla_g_group
+					Having Count(*)>10
+		)
+		Select   c2.gen_cd
+				,c2.uexon_num
+				,c2.allele_name
+				,c2.hla_g_group
+			From _cte_2 c2 
+				inner join _cte_3 c3 On c3.allele_name=c2.allele_name
+				inner join _cte_4 c4 On c4.allele_name=c2.allele_name
+			Group By c2.gen_cd,c2.uexon_num,c2.hla_g_group,c2.allele_name
+		    Order By c2.gen_cd
+					,c2.uexon_num
+					,c2.hla_g_group
+					,c2.allele_name
+
+
+
+    -- ****************************************************************************************************
     -- Алгоритм усреднения 2
-    -- ====================================================================================================
+    -- ****************************************************************************************************
     Declare @n1 Int
             ,@cnt_all   Numeric(7,2)
             ,@max_len   Int
