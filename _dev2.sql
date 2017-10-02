@@ -651,25 +651,63 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     Select *
         From hla_reads_align ra With (Nolock)
         Where ra.gen_cd='DQB1'
+        And ra.uexon_num=2
         Order By ra.read_diff_seq 
 
     Select Count(*)
         From hla_reads_align ra With (Nolock)
         Where ra.gen_cd='DQB1'
 
-    Select Count(*)
-            ,substring(ra.read_diff_seq ,1,278)
+   Select Count(*)
+            ,ra.read_diff_seq 
         From hla_reads_align ra With (Nolock)
         Where ra.gen_cd='DQB1'
-        Group by substring(ra.read_diff_seq ,1,278)
-        Order By Count(*),substring(ra.read_diff_seq ,1,278)
+        Group by ra.read_diff_seq 
+        Order By Count(*),ra.read_diff_seq 
 
-    Select *
+    Select Count(*)
+            ,substring(ra.read_diff_seq ,1,270)
+        From hla_reads_align ra With (Nolock)
+        Where ra.gen_cd='DQB1'
+        Group by substring(ra.read_diff_seq ,1,270)
+        Order By Count(*),substring(ra.read_diff_seq ,1,270)
+
+    Select Count(*)
+            ,ue.gen_cd
+            ,ue.uexon_num
+            ,a.allele_name
+            ,f.feature_name
+            ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
         From dna2_hla.dbo.hla_uexon ue
-        Where ue.uexon_diff_seq Like '-------------------------------------------------G-------------------C----T-.---------------G---.-A--CA----------------------T--A-.-------------C--------C---------------------------------.-G------------CC-------A-T------C-----------------------------------------------------%'
+        Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
+        Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
+        Inner Join hla_reads_align ra With (Nolock) 
+                On ra.gen_cd=ue.gen_cd  
+                    and ra.uexon_num=ue.uexon_num
+                    and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
+        Where ue.uexon_diff_seq Like '--------------------------C----------------------G-----------GGG-----C----c-.---------------G---.-a--------------------------T--a------A-------C--A-----G-----TT--------------------------.-g--------G--GCC------T-----------------------------G--G---C-.-a----GG--t--.-----A-%'
+        Group by ue.gen_cd
+                ,ue.uexon_num
+                ,a.allele_name
+                ,f.feature_name
+                ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
+        Order By ue.gen_cd
+                ,ue.uexon_num
+                ,a.allele_name
+                ,f.feature_name
+                ,Count(*)
+                ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
+
+    Select a.allele_name
+            ,a.hla_g_group
+            ,f.*
+        From dna2_hla.dbo.hla_uexon ue
+            Inner Join dna2_hla.dbo.hla_features f On f.feature_nucsequence = ue.uexon_seq
+            Inner Join dna2_hla.dbo.hla_alleles a On a.allele_id = f.allele_id
+        Where a.allele_name In ('HLA-DPB1*352:01','HLA-DPB1*414:01')
 
     -- ====================================================================================================
-    -- Алгоритм усреднения
+    -- Алгоритм усреднения 2
     -- ====================================================================================================
     Declare @n1 Int
             ,@cnt_all   Numeric(7,2)
@@ -677,154 +715,172 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             ,@level     Numeric(5,2)
             ,@all_Like  Varchar(20)
             ,@char_cnt  int
+            ,@char_cnt2 int
             ,@char_val  varchar(1)
+            ,@k_loop    int
+
+    Declare @row_num2       Int
+            ,@all_name      varchar(50)
+            ,@exon_name     varchar(50)
+            ,@exon_num      Int
+            ,@gen_cd        Varchar(20)
+            ,@exon_seq      Varchar(Max)
+            ,@fexon_iid     Numeric(14)
+            ,@exon_len      Int
 
     Select @level=0.1
-    Select @all_Like='HLA-A*%'
-    -- Select @all_Like='%DRB1%'
-    
+
     -- Временные таблицы
     If Object_id('tempdb..#res_diff') Is Not Null
         drop Table #res_diff
     If Object_id('tempdb..#col_chars') Is Not Null
         drop Table #col_chars
+
     Create table #col_chars (
         curr_char   Varchar(1)
         ,char_cnt   int
         ,char_rate  Numeric(7,2)
     )
 
-    ;With _cte_reads As (
-        Select rm.read_iid
-            From hla_join_max rm
-                Inner Join hla_reads wr With (Nolock) On wr.read_iid=rm.read_iid
-                Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
-                Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-                Inner Join dna2_hla.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
-            Where 1=1
-                And a.allele_name Like @all_Like
-                And ue.uexon_name='exon 4'
-            Group By rm.read_iid 
-        )
-    Select wr.*
-            ,read_seq_res_diff   = wr.read_seq_diff
-        Into #res_diff
-        From hla_reads wr With (Nolock)
-        Inner Join _cte_reads ce On ce.read_iid=wr.read_iid
-        Order By wr.read_seq_diff 
+    -- ==================================================
+    -- Цикл по родительским экзонам
+    -- ==================================================
+    -- Select * From [hla_fexon_align]
 
-    Select @n1      = 1
-    Select @max_len = Max(Len(read_seq_res_diff)) From #res_diff
-    Select @cnt_all = Count(*) From #res_diff
-    While @n1<=@max_len
+    Select @fexon_iid=Min(al.fexon_iid)
+        From dna2_hla.dbo.hla_fexon_align al
+
+
+    While Isnull(@fexon_iid,0)<>0
     Begin
-/*
-        -- ver 1
-        If @n1=-232
+        Select @all_name    = t.allele_name
+              ,@exon_num    = t.exon_num
+              ,@exon_seq    = t.exon_seq
+              ,@gen_cd      = t.gen_cd
+              ,@exon_len    = t.exon_len
+            From dna2_hla.dbo.[hla_fexon_align] t
+            Where fexon_iid=@fexon_iid
+
+
+        Print '=================================================='
+        Print '*** Усреднение all_name='+@all_name+' exon_num='+cast(@exon_num As Varchar(2))+' exon_seq='+@exon_seq
+
+        -- ==================================================
+        -- Цикл по символам - обработка вставок и удалений
+        -- ==================================================
+        Select @n1      = 1
+        Select @max_len = Max(Len(ra.read_diff_seq)) 
+             , @cnt_all = Count(*) 
+            From hla_reads_align ra
+            Where ra.uexon_num=@exon_num
+                And ra.gen_cd=@gen_cd
+        While @n1<=@max_len
         Begin
+            
 
-    	    Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
-                    ,char_cnt   = Count(*)
-                    ,char_rate  = Count(*)/@cnt_all
-                From #res_diff
-                Group By Substring(read_seq_res_diff,@n1,1)
-
-            ;With _cte_char As (
-    	        Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
+            Select @k_loop=0
+            Delete from #col_chars
+            Insert #col_chars
+    	        Select curr_char    = Substring(read_diff_seq ,@n1,1)
                         ,char_cnt   = Count(*)
                         ,char_rate  = Count(*)/@cnt_all
-                    From #res_diff
-                    Group By Substring(read_seq_res_diff,@n1,1)
-                )
-            Select read_seq_res_diff,
-                read_seq_res_diff=STUFF(
-                          read_seq_res_diff
-                        , @n1
-                        , 1
-                        , Case 
-                            When ct.curr_char='^' And char_rate<@level Then ''
-                            When ct.curr_char='.' And char_rate<@level Then '-'
-                            When ct.curr_char Not In ('.','^','-') And char_rate<@level Then '-'
-                            Else ct.curr_char
-                        End
-                        )
-                From #res_diff t
-                Inner Join _cte_char ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
+                    From hla_reads_align ra
+                    Where ra.uexon_num=@exon_num
+                        And ra.gen_cd=@gen_cd
+                    Group By Substring(ra.read_diff_seq,@n1,1)
+            Select @char_cnt2=@@rowcount
+            If @char_cnt2=0
+            Begin
+                Break
+            End
+            Select @k_loop=isNull(Count(*),0)
+                From #col_chars
+                where curr_char In ('0','1','2','3') 
+
+            --Print 'gn_cd='+@gen_cd
+            --        +'  @exon_num='+Cast(@exon_num As Varchar(20))
+            --        +'  @step='+Cast(@n1 As Varchar(20))
+            --        +'  @k_loop='+Cast(@k_loop As Varchar(20))
+            --        +'  @max_len='+Cast(@max_len As Varchar(20))
+            --        +'  @@rowcount='+Cast(@char_cnt2 As Varchar(20))
+
+            If @k_loop>0
+            Begin
+
+                Select @char_cnt=Count(*) 
+                    From #col_chars
+                    where char_rate>=@level
+                Select @char_val=curr_char
+                    From #col_chars
+                    where char_rate>=@level
+
+                Update hla_reads_align
+                    Set read_diff_seq=STUFF(
+                              read_diff_seq
+                            , @n1
+                            , 1
+                            , Case 
+                                -- Это вставка в шаблон - считаем, что в риде лишний символ 
+                                When ct.curr_char In ('0','1','2','3') 
+                                    And char_rate<@level 
+                                    And @char_cnt=1 
+                                    And @char_val not In ('0','1','2','3') Then ''
+                                -- Это символ - просто символ
+                                When ct.curr_char='0' Then 'a'
+                                When ct.curr_char='1' Then 'c'
+                                When ct.curr_char='2' Then 'g'
+                                When ct.curr_char='3' Then 't'
+                                Else ct.curr_char
+                            End
+                            )
+                    From hla_reads_align ra With (Nolock)
+                    Inner Join #col_chars ct On ct.curr_char=Substring(ra.read_diff_seq ,@n1,1)
+                    where Len(read_diff_seq)>=@n1
+                        And ra.uexon_num=@exon_num
+                        And ra.gen_cd=@gen_cd
+                        And (      (ct.curr_char<>@char_val And @char_cnt=1) 
+                                Or (ct.curr_char In ('0','1','2','3') And @char_cnt=1) 
+                                Or @char_cnt>1 
+                                )
+
+            End Else
+            Begin
+
+                Select @char_cnt=Count(*) 
+                    From #col_chars
+                    where char_rate>=@level
+                Select @char_val=curr_char
+                    From #col_chars
+                    where char_rate>=@level
+
+                Update hla_reads_align
+                    Set read_diff_seq=STUFF(
+                                read_diff_seq
+                            , @n1
+                            , 1
+                            , Case 
+                                When ct.curr_char='.' And char_rate<@level and @char_cnt=1 Then @char_val
+                                When ct.curr_char='.' And char_rate<@level and @char_cnt>1 Then '?'
+                                When ct.curr_char Not In ('.','^','-') and @char_cnt=1 and char_rate<@level Then @char_val
+                                When ct.curr_char Not In ('.','^','-') and @char_cnt>1 and char_rate<@level Then '?'
+                                Else ct.curr_char
+                            End
+                            )
+                    From hla_reads_align ra With (Nolock)
+                    Inner Join #col_chars ct On ct.curr_char=Substring(ra.read_diff_seq ,@n1,1)
+                    where Len(read_diff_seq)>=@n1
+                        And ra.uexon_num=@exon_num
+                        And ra.gen_cd=@gen_cd
+                        And ( (ct.curr_char<>@char_val And @char_cnt=1) Or @char_cnt>1 )
+                Select @n1=@n1+1
+            End
         End
 
-        -- ver 2
-        ;With _cte_char As (
-    	    Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
-                    ,char_cnt   = Count(*)
-                    ,char_rate  = Count(*)/@cnt_all
-                From #res_diff
-                Group By Substring(read_seq_res_diff,@n1,1)
-            )
-        Update #res_diff
-            Set read_seq_res_diff=STUFF(
-                      read_seq_res_diff
-                    , @n1
-                    , 1
-                    , Case 
-                        When ct.curr_char='^' Then ''
-                        When ct.curr_char='.' And char_rate<@level Then '-'
-                        When ct.curr_char Not In ('.','^','-') And char_rate<@level Then '?'
-                        Else ct.curr_char
-                    End
-                    )
-            From #res_diff t
-            Inner Join _cte_char ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
-            where Len(read_seq_res_diff)>=@n1
+    	-- Продолжить цикл
+        Select @fexon_iid=Min(fexon_iid)
+            From dna2_hla.dbo.[hla_fexon_align]
+            Where fexon_iid>@fexon_iid
 
-*/
-        -- Обработка вставок в шаблон
-        While Exists( Select 1
-                        From #res_diff
-                        Where Substring(read_seq_res_diff ,@n1,1)='^'   
-                            And Len(read_seq_res_diff)>=@n1
-                        Group By Substring(read_seq_res_diff ,@n1,1)
-                        Having Count(*)/@cnt_all<@level)
-        Begin
-            Update #res_diff
-                Set read_seq_res_diff=STUFF(read_seq_res_diff, @n1, 1, '')
-                From #res_diff t
-                Where Substring(t.read_seq_res_diff ,@n1,1)='^'
-                    And Len(read_seq_res_diff)>=@n1
-        End
-
-        Delete from #col_chars
-        Insert #col_chars
-    	    Select curr_char    = Substring(read_seq_res_diff ,@n1,1)
-                    ,char_cnt   = Count(*)
-                    ,char_rate  = Count(*)/@cnt_all
-                From #res_diff
-                Group By Substring(read_seq_res_diff,@n1,1)
-        Select @char_cnt=Count(*) 
-            From #col_chars
-            where char_rate>=@level
-        Select @char_val=curr_char
-            From #col_chars
-            where char_rate>=@level
-
-        Update #res_diff
-            Set read_seq_res_diff=STUFF(
-                      read_seq_res_diff
-                    , @n1
-                    , 1
-                    , Case 
-                        When ct.curr_char='^' Then ''
-                        When ct.curr_char='.' And char_rate<@level and @char_cnt=1 Then @char_val
-                        When ct.curr_char='.' And char_rate<@level and @char_cnt>1 Then '?'
-                        When ct.curr_char Not In ('.','^','-') and @char_cnt=1 and char_rate<@level Then @char_val
-                        When ct.curr_char Not In ('.','^','-') and @char_cnt>1 and char_rate<@level Then '?'
-                        Else ct.curr_char
-                    End
-                    )
-            From #res_diff t
-            Inner Join #col_chars ct On ct.curr_char=Substring(t.read_seq_res_diff ,@n1,1)
-            where Len(read_seq_res_diff)>=@n1
-
-        Select @n1=@n1+1
     End
 
     -- ==================================================
@@ -848,11 +904,11 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     While 1=1
     Begin
     	Select top 1 
-                @seq_str    = read_seq_res_diff
-                ,@main_pos  = Charindex('?',read_seq_res_diff)
+                 @seq_str    = read_diff_seq
+                ,@main_pos  = Charindex('?',read_diff_seq)
                 ,@read_iid  = read_iid
-            From #res_diff
-            Where Charindex('?',read_seq_res_diff)>0
+            From hla_reads_align
+            Where Charindex('?',read_diff_seq)>0
         If @@rowcount=0 Break;
 
         Select @beg_pos = 1
@@ -862,11 +918,11 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 
         Delete from #mask
         Insert #mask
-            Select Substring(read_seq_res_diff,@beg_pos,13)
-                From #res_diff
-                Where Substring(read_seq_res_diff,@beg_pos,13) Like @mask
-                    and Charindex('?',Substring(read_seq_res_diff,@beg_pos,13))=0
-                Group By Substring(read_seq_res_diff,@beg_pos,13)
+            Select Substring(read_diff_seq,@beg_pos,13)
+                From hla_reads_align
+                Where Substring(read_diff_seq,@beg_pos,13) Like @mask
+                    and Charindex('?',Substring(read_diff_seq,@beg_pos,13))=0
+                Group By Substring(read_diff_seq,@beg_pos,13)
         Select @mask_cnt=Count(*) From #mask 
 
         -- Select @seq_str,@main_pos,@beg_pos,@mask,@mask_cnt
@@ -874,17 +930,17 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         If @mask_cnt=1 
         Begin
             Select @mask_val=substring(mask_val,7,1) From #mask
-        	Update #res_diff
-                Set read_seq_res_diff = Stuff(read_seq_res_diff,@main_pos,1,@mask_val)
-                From #res_diff
-                Where Substring(read_seq_res_diff,@beg_pos,13) Like @mask
-                    and Substring(read_seq_res_diff,@main_pos,1)='?'
+        	Update hla_reads_align
+                Set read_diff_seq = Stuff(read_diff_seq,@main_pos,1,@mask_val)
+                From hla_reads_align
+                Where Substring(read_diff_seq,@beg_pos,13) Like @mask
+                    and Substring(read_diff_seq,@main_pos,1)='?'
         End
         If @mask_cnt<>1 
         Begin
             Select @mask_val=mask_val From #mask
-        	Update #res_diff
-                Set read_seq_res_diff = Stuff(read_seq_res_diff,@main_pos,1,'$')
+        	Update hla_reads_align
+                Set read_diff_seq = Stuff(read_diff_seq,@main_pos,1,'$')
                 Where read_iid=@read_iid
         End
 
