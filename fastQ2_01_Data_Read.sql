@@ -60,8 +60,7 @@ Begin
 	    If Isnull(@end_Num ,0)>0
 	    Begin
 	        Select @read_Str = Substring(@cData ,@start_Num ,@end_Num-@start_Num)
-	        Print '@start_Num='+Convert(Varchar(15) ,Isnull(@start_Num ,0))+' @end_Num='+Convert(Varchar(15) ,Isnull(@end_Num ,0))+' @read_Str='+@read_Str
-	        --if substring(@read_Str,1,7)='@CXZDV:'
+	        -- Print '@start_Num='+Convert(Varchar(15) ,Isnull(@start_Num ,0))+' @end_Num='+Convert(Varchar(15) ,Isnull(@end_Num ,0))+' @read_Str='+@read_Str
 	        If Substring(@read_Str ,1 ,1)='@' And @beg_Num In (0 ,4)
 	            Select @beg_Num         = 1
 	                  ,@data_id         = @read_Str

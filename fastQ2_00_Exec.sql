@@ -5,22 +5,25 @@
 -- ****************************************************************************************************
 -- Чтения
 -- ****************************************************************************************************
-	Use DNA2_FASTQ
+	Select 'начало=',Getdate()
+    DBCC FREEPROCCACHE
+    DBCC DROPCLEANBUFFERS 
+    Use DNA2_FASTQ
     Go
 
     -- Прочитать файл    
-    -- Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_08_23-HLAi-I-II-example\test.fastq'
-    -- Exec fastQ2_Data_read @file_name='C:\WORK\NGS\APP\Trimmomatic-0.36\IonXpress_032_21_07_17_115.out'
     print '**************************************************'
     print 'Чтение данных FastQ'
     print '**************************************************'
-    Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_29_20171002T164751Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-160_PCOS-54_IonXpress_054.fastq'
+    -- Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_29_20171002T164751Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-160_PCOS-54_IonXpress_054.fastq'
+    Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_27_hla_11_8-20170928T123327Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-153_PCOS-48_IonXpress_048.fastq'
     Go
 
     DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
     GO
  
     -- Разбить на части, сделать хэш
+	Select 'create hash=',Getdate()
     print '**************************************************'
     print 'Part create FastQ'
     print '**************************************************'
@@ -29,50 +32,65 @@
 
     DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
     GO
+	Select 'create hash end=',Getdate()
+
  
 -- ****************************************************************************************************
 -- Сравнение чтений и экзонов
 -- ****************************************************************************************************
+    DBCC FREEPROCCACHE
+    DBCC DROPCLEANBUFFERS 
+    -- UPDATE STATISTICS hla_reads_part -- WITH fullscan
+
+    Declare @curr_time  DateTime
 
     print '**************************************************'
     print 'Сравнение чтений и экзонов'
     print '**************************************************'
 
+    Select @curr_time=Getdate()
+   	Select 'Сравнение чтений и экзонов=',Getdate()
+
 	-- ==================================================
 	-- Таблица повторяющихся к-мер
 	-- ==================================================
-	If object_id('tempdb..#part') Is Not null
-		Drop table #part
-	If object_id('tempdb..#part_cnt') Is Not null
-		Drop table #part_cnt
-	If object_id('tempdb..#part_cnt_max') Is Not null
-		Drop table #part_cnt_max
+	If object_id('tempdb..#reads_buf') Is Not null
+		Drop table #reads_buf
+	If object_id('tempdb..#part_Cnt') Is Not null
+		Drop table #part_Cnt
+	If object_id('tempdb..#part_Cnt_max') Is Not null
+		Drop table #part_Cnt_max
+    If Object_id('hla_join') Is Not null
+         Drop table hla_join
 
-    print '*** Create #part_cnt'
+    print '*** Create #part_Cnt'
 
-    -- ==================================================
-    -- Количество совпадений каждого рида с экзонами
-    -- ==================================================
     -- vars
     Declare @min_read_iid   int
     -- tmp tables
-    Create table #part (
+    Create table #reads_buf (
          read_iid   Int
         ,read_len   int
     )
     Create table #part_Cnt (
-         eq_cnt     Numeric(3)
-        ,read_iid   Int
-        ,uexon_iid  Int
+         eq_cnt         Numeric(3)
+        ,read_iid       Int
+        ,uexon_iid      Int
+        ,epart_cnt      Smallint
+        ,k_forward_back Smallint
     )
 
+    -- ==================================================
+    -- Временная таблица совпадений
+    -- #part_Cnt
+    -- ==================================================
     Select @min_read_iid=Min(read_iid)
         From hla_reads r With (Nolock)
     While Isnull(@min_read_iid,0)<>0
     Begin
         Print 'step 1000 '+Cast(@min_read_iid As Varchar(20))
-        Delete From #part
-        Insert #part
+        Delete From #reads_buf
+        Insert #reads_buf
     	    Select Top 2000 
                     r.read_iid
                   , r.read_len
@@ -80,7 +98,7 @@
                 Where r.read_iid>=@min_read_iid
                 Order By r.read_iid
         Select @min_read_iid=Max(read_iid)
-            From #part
+            From #reads_buf
         If Isnull(@min_read_iid,0)=0
         Begin
         	Break
@@ -88,52 +106,52 @@
         Select @min_read_iid=@min_read_iid+1
 
         Insert #part_Cnt
-            Select eq_cnt = Count(*)
-                ,rp.read_iid
-                ,ep.uexon_iid
+            Select eq_cnt       = Count(*)
+                ,read_iid       = rp.read_iid
+                ,uexon_iid      = ep.uexon_iid
+                ,epart_cnt      = max(ep.epart_cnt)
+                ,k_forward_back = max(ep.k_forward_back)
                 from hla_reads_part rp With (Nolock)
+                    Inner Join hla_reads_upart up With (Nolock) On up.rpart_hash=rp.rpart_hash
                     Inner Join dna2_hla.dbo.hla_uexon_part ep With (Nolock) On ep.epart_hash=rp.rpart_hash 
-                    Inner Join dna2_hla.dbo.hla_uexon e With (Nolock) On ep.uexon_iid=e.uexon_iid
-                    Inner Join #part r With (Nolock) On r.read_iid=rp.read_iid
+                    Inner Join #reads_buf r With (Nolock) On r.read_iid=rp.read_iid
                 Where 1=1
-                    and e.uexon_len<=r.read_len
+                    and ep.uexon_len<=r.read_len
                 Group by rp.read_iid,ep.uexon_iid
+                -- OPTION (MAXDOP 1);
+
     End
-    Go
+    Select 'Create #reads_buf',DateDiff(second, @curr_time, Getdate())
 
-    --Select eq_cnt = Count(*)
-    --    ,rp.read_iid
-    --    ,ep.uexon_iid
-    --    Into #part_Cnt
-    --    from hla_reads_part rp With (Nolock)
-    --        Inner Join dna2_hla.dbo.hla_uexon_part ep With (Nolock) On ep.epart_hash=rp.rpart_hash 
-    --        Inner Join dna2_hla.dbo.hla_uexon e With (Nolock) On ep.uexon_iid=e.uexon_iid
-    --        Inner Join hla_reads r With (Nolock) On r.read_iid=rp.read_iid
-    --    Where 1=1
-    --        and e.uexon_len<=r.read_len
-    --    Group by rp.read_iid,ep.uexon_iid
-    --Go
-
+    -- ==================================================
     -- Записать результат в постоянную таблицу hla_join
-    -- 03:30
+    -- ==================================================
+    Select @curr_time=Getdate()
     print '*** Create hla_join'
     If Object_id('hla_join') Is Not null
          Drop table hla_join
     Select t.*
         Into hla_join
         From #part_Cnt t
-    Go
- 	If object_id('tempdb..#part_cnt') Is Not null
-		Drop table #part_cnt
-    Go
-    -- 09:00        
-    Create Index hla_cross_idx1 On hla_join(read_iid,uexon_iid,eq_cnt)
-    Go
-    DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
-    GO
+ 	If object_id('tempdb..#part_Cnt') Is Not null
+		Drop table #part_Cnt
+    Select 'Create hla_join',DateDiff(second, @curr_time, Getdate())
 
+    -- ==================================================
+    -- Проиндексировать таблицу hla_join
+    -- ==================================================
+    Select @curr_time=Getdate()
+    --Create NonClustered Index hla_cross_idx1 
+    --    On hla_join(read_iid,uexon_iid,eq_cnt) 
+    --    with (SORT_IN_TEMPDB = On) 
+    Select 'Create Index hla_join',DateDiff(second, @curr_time, Getdate())
+    DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
+
+    -- ==================================================
     -- Записать результат в постоянную таблицу hla_join_max
-    print '*** Create hla_join_max'
+    -- ==================================================
+    Select @curr_time=Getdate()
+    print '*** Create table hla_join_max'
     If Object_id('hla_join_max') Is Not null
          Drop table hla_join_max
     Create table hla_join_max (
@@ -152,25 +170,29 @@
      Select  j.read_iid        
             ,j.uexon_iid      
             ,j.eq_cnt    
-            ,e.k_forward_back
+            ,j.k_forward_back
          from hla_join j With (Nolock)
-             Inner Join dna2_hla.dbo.hla_uexon e With (Nolock) On j.uexon_iid=e.uexon_iid
          Where 1=1
-            And j.eq_cnt>=e.epart_cnt*0.7
+            And j.eq_cnt>=j.epart_cnt*0.7
          Order By j.read_iid, j.uexon_iid
-    Go
-    -- 01:00
+    Select 'Create table hla_join_max',DateDiff(second, @curr_time, Getdate())
+
+    -- ==================================================
+    -- Проиндесировать hla_join_max
+    -- ==================================================
+    Select @curr_time=Getdate()
     Create Index hla_cross_max_idx1 On hla_join_max(read_iid,uexon_iid)
     Create Index hla_cross_max_idx2 On hla_join_max(read_iid,join_max_iid)
     Create Index hla_cross_max_idx3 On hla_join_max(uexon_iid,join_max_iid)
     Create Index hla_cross_max_idx4 On hla_join_max(eq_cnt,join_max_iid)
-    Go
+    Select DateDiff(minute, @curr_time, Getdate())
     DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
-    GO
+    Select 'Create index hla_join_max',DateDiff(second, @curr_time, Getdate())
 
     -- ==================================================
 	-- Обработать обраные риды
     -- ==================================================
+    Select @curr_time=Getdate()
     -- Список обратных ридов    
 	-- Перевернули
     Update hla_reads
@@ -201,8 +223,8 @@
         Inner Join dna2_hla.dbo.hla_uexon e With (Nolock) On e.uexon_iid=rm.uexon_iid
         Where rm.k_forward_back=2
 
-    Go
     DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
-    GO
+    Select 'back read process',DateDiff(second, @curr_time, Getdate())
 
+	Select 'Завершено=',Getdate()
 

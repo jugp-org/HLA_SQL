@@ -51,6 +51,7 @@ Begin
     	        uexon_iid
     	       ,epart_pos
                ,epart_hash
+               ,uexon_len
     	      )
     	    Select ue.uexon_iid
     	          , @n
@@ -74,10 +75,32 @@ Begin
                       --+      1073741824*(Case Substring(ue.uexon_seq,@n ,16) When 'A' Then 0 When 'C' Then 1 When 'G' Then 2 When 'T' Then 3 End)
                       --+      4294967296*(Case Substring(ue.uexon_seq,@n ,17) When 'A' Then 0 When 'C' Then 1 When 'G' Then 2 When 'T' Then 3 End)
                       --+      17179869184*(Case Substring(ue.uexon_seq,@n ,18) When 'A' Then 0 When 'C' Then 1 When 'G' Then 2 When 'T' Then 3 End)
+                    , ue.uexon_len
     	        From hla_uexon ue
     	        Where  Len(ue.uexon_seq)>= @n+@hash_len-1
     	    Select @n = @n+@hash_len
         End
+
+        -- Данные по экхонам
+        Update hla_uexon_part
+            Set uexon_len       = ue.uexon_len
+                ,epart_cnt      = ue.epart_cnt
+                ,k_forward_back = ue.k_forward_back
+            From hla_uexon_part ep
+            Inner Join hla_uexon ue With (Nolock) On ue.uexon_iid=ep.uexon_iid
+
+        -- Таблица уникальных частей
+        Truncate Table hla_uexon_upart
+        Insert INTO hla_uexon_upart
+            (epart_hash
+            ,epart_seq)   
+            Select distinct 
+                    epart_hash
+                    ,''
+                From hla_uexon_part
+
+        Update hla_uexon_upart
+            Set epart_seq=dbo.sql_str_hash_decode(epart_hash)
 
     End
 

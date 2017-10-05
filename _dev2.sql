@@ -241,6 +241,12 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     Select Count(*) 
         From dna2_hla..hla_uexon_part2
  
+    -- Уникальные части экзонов
+    Select Count(*) 
+        From dna2_hla.dbo.hla_uexon_upart
+    Select Top 1000 *
+        From dna2_hla.dbo.hla_uexon_upart
+ 
  
     -- ****************************************************************************************************
     -- Чтения
@@ -256,7 +262,10 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Order By rd.read_cd
 
     Select Count(*)
-        From hla_reads
+        From hla_reads r
+
+    Select sum(r.read_len-11)
+        From hla_reads r
  
     -- ==================================================
     -- K-mers read
@@ -278,6 +287,12 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     -- ==================================================
     -- Уникальные вхождения в hla_reads_part
     -- ==================================================
+    Select Count(*)
+            , p.rpart_hash
+        From hla_reads_part p
+        Group By p.rpart_hash
+        Order By  Count(*)
+
     Select up.*
         From hla_reads_upart up
         Order By up.urpart_cnt 
@@ -682,6 +697,23 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Order By Count(*),substring(ra.read_diff_seq ,1,270)
 
 
+    -- Список экзонов
+    Select a.allele_name
+            ,a.hla_g_group
+            ,f.feature_name
+            ,f.feature_nucsequence
+            ,f.*
+        From [dna2_hla].[dbo].hla_features f with (NoLock) 
+		Inner Join dna2_hla.dbo.hla_alleles a with (NoLock) On a.allele_id=f.allele_id 
+        Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And ue.k_forward_back=1
+        Where 1=1
+            --And ue.uexon_diff_seq Like '--------C-T-T-----------------------------------------------------------------------------T-------------------------------------------------------------------------------------------------------------------------A-G----------------------G--%'
+             -- And a.hla_g_group='DQB1*03:01:01G'
+             -- And f.feature_name='exon 2'
+        Order by f.feature_name
+                ,a.allele_name
+                ,f.feature_nucsequence
+
     -- ==================================================
 	-- Количество точных совпадений DIFF
 	-- Для одного экзона
@@ -701,10 +733,10 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                     and ra.uexon_num=ue.uexon_num
                     and Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))=ue.uexon_diff_seq
         Where 1=1
-			-- and ue.uexon_diff_seq Like '--------------------------C----------------------G-----------GGG-----C----c-.---------------G---.-a--------------------------T--a------A-------C--A-----G-----TT--------------------------.-g--------G--GCC------T-----------------------------G--G---C-.-a----GG--t--.-----A-%'
-			and ra.gen_cd='C'
-			And ra.uexon_num=2
-			And a.allele_name Like 'HLA-C%'
+			-- and ra.gen_cd='C'
+			-- and ra.gen_cd='DQB1'
+			-- And ra.uexon_num=2
+			-- And a.allele_name Like 'HLA-C%'
         Group by ue.gen_cd
                 ,ue.uexon_num
                 ,a.hla_g_group
@@ -719,6 +751,16 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                 ,Count(*)
                 ,Substring(ra.read_diff_seq,1,Len(ue.uexon_diff_seq))
 
+    Select *    
+        From hla_reads_align a
+        Where a.read_diff_seq Like '------------------------C------------------------G------------.-0-----C----3-.---------------G---.-0--CA-------------------A--T--A--------------C--------C-----A---------------------------.-2------------CC-------A-T------C-------------------------------------------------%'
+
+    Select *
+        From hla_reads
+        Where read_iid=103303
+
+    Select *
+        From dna2_hla.dbo.hla_fexon_align
 
     -- ==================================================
 	-- Количество точных совпадений DIFF
