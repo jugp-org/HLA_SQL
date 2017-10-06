@@ -209,6 +209,27 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             ,e.uexon_num
             ,Len(e.uexon_seq)
 
+    -- Список экзонов, у котрых есть соответствия в другом гене
+    Select a.allele_name
+            ,f.*
+        From dna2_hla.dbo.hla_features f With (Nolock) 
+        Inner Join dna2_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+        Where f.feature_nucsequence In (
+	        Select e.uexon_seq
+	            From dna2_hla.dbo.hla_uexon e
+	            Where  1 = 1
+                       And (
+                            (e.uexon_num In (2,3,4) And e.gen_cd In ('A','B','C')) 
+                            Or 
+                            (e.uexon_num In (2) And e.gen_cd In ('DRB1','DQB1','DPB1'))
+                        )
+	            Group By e.uexon_seq
+                Having count(*)>1
+        )
+        Order by a.allele_name
+
+
+    Select Count(*) From dna2_hla.dbo.hla_uexon_part
 
     -- Выравнивание экзонов
     Select *
@@ -548,7 +569,28 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Order By gen_name,uexon_name
 
 
-    -- Проверка кластеризации
+    -- Проверка кластеризации по hla_join
+    -- выделим риды, одновременно похожие на разные экзоны или гены
+    ;With _cte_uread As (
+        Select  Distinct
+                rm.read_iid
+                ,ue.gen_cd
+                ,ue.uexon_num
+            From hla_join rm
+                Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid = rm.uexon_iid -- And ue.k_forward_back=2
+            Where (
+                    (ue.gen_cd In ('A','B','C') and ue.uexon_num In (2,3,4)
+                    Or 
+                    (ue.gen_cd In ('DRB1','DQB1','DPB1') and ue.uexon_num In (2))
+                    )
+                  )
+        )
+    Select *
+        From _cte_uread t1
+        Inner Join _cte_uread t2 On t1.read_iid=t2.read_iid And (t1.gen_cd<>t2.gen_cd Or t1.uexon_num<>t2.uexon_num)
+        Order By t1.gen_cd,t1.uexon_num,t1.read_iid
+
+    -- Проверка кластеризации по hla_join_max
     -- выделим риды, одновременно похожие на разные экзоны или гены
     ;With _cte_uread As (
         Select  Distinct

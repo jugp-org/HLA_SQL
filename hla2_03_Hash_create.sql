@@ -91,16 +91,72 @@ Begin
 
         -- Òàáëèöà óíèêàëüíûõ ÷àñòåé
         Truncate Table hla_uexon_upart
-        Insert INTO hla_uexon_upart
-            (epart_hash
-            ,epart_seq)   
+        Insert INTO hla_uexon_upart (
+             epart_hash
+            ,epart_seq
+            )   
             Select distinct 
-                    epart_hash
+                     ep.epart_hash
                     ,''
-                From hla_uexon_part
+                From hla_uexon_part ep With (Nolock)
+                    Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=ep.uexon_iid
+                Where 1=1
+                    And (
+                        (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
+                        Or 
+                        (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
+                    )
+                Group By ep.epart_hash
+                Order By ep.epart_hash
 
         Update hla_uexon_upart
             Set epart_seq=dbo.sql_str_hash_decode(epart_hash)
+
+        -- Òàáëèöà óíèêàëüíûõ ÷àñòåé
+        -- ñòî÷íîñòüş äî ãåíà è ıêçîíà
+        Truncate Table hla_uexon_ugpart
+        Insert INTO hla_uexon_ugpart (
+             epart_hash
+            ,gen_cd
+            ,uexon_num
+            ,epart_seq
+            ,uexon_cnt
+            )   
+            Select distinct 
+                     ep.epart_hash
+                    ,ue.gen_cd
+                    ,ue.uexon_num
+                    ,''
+                    ,Count(*)
+                From hla_uexon_part ep With (Nolock)
+                    Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=ep.uexon_iid
+                Where 1=1
+                    And (
+                        (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
+                        Or 
+                        (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
+                    )
+                Group By ep.epart_hash
+                        ,ue.gen_cd
+                        ,ue.uexon_num
+                Order By ue.gen_cd
+                        ,ue.uexon_num
+
+        Update hla_uexon_ugpart
+            Set epart_seq=dbo.sql_str_hash_decode(epart_hash)
+
+        -- Êëş÷ ïğèíàäëåæíîñòè ê ğàçíûì ıêçîíàì/ãåíàì
+        Update dna2_hla.dbo.hla_uexon_ugpart
+    	    Set    k_dbl = 0
+        Update dna2_hla.dbo.hla_uexon_ugpart
+    	    Set    k_dbl = 1
+    	    From   dna2_hla.dbo.hla_uexon_ugpart gp
+    	    Where  gp.epart_hash In (Select up.epart_hash
+    	                                 From dna2_hla.dbo.hla_uexon_ugpart up
+    	                                 Group By up.epart_hash
+    	                                 Having Count(*)>1)
+
+
 
     End
 
