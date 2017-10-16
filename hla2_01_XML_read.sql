@@ -85,7 +85,7 @@ Begin
 	       Into #alleles
 	    From Openxml(@xml_id ,'/alleles/allele' ,2)
 	         With ( [allele_id] Varchar(20) '@id'
-	          ,[allele_name] Varchar(20) '@name'
+	          ,[allele_name] Varchar(50) '@name'
 	          ,[allele_dateassigned] Varchar(10) '@dateassigned'
 	          ,[release_firstreleased] Varchar(10) 'releaseversions/@firstreleased'
 	          ,[release_lastupdated] Varchar(10) 'releaseversions/@lastupdated'
