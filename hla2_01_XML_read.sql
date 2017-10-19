@@ -84,7 +84,7 @@ Begin
 	Select *
 	       Into #alleles
 	    From Openxml(@xml_id ,'/alleles/allele' ,2)
-	         With ( [allele_id] Varchar(20) '@id'
+	         With ( [allele_id] Varchar(30) '@id'
 	          ,[allele_name] Varchar(50) '@name'
 	          ,[allele_dateassigned] Varchar(10) '@dateassigned'
 	          ,[release_firstreleased] Varchar(10) 'releaseversions/@firstreleased'
@@ -101,8 +101,8 @@ Begin
 	          ,[cwd_status] Varchar(30) 'cwd_catalogue/@cwd_status'
 	          ,[cwd_version] Varchar(30) 'cwd_catalogue/@cwd_version'
 	          ,[cwd_reference] Varchar(80) 'cwd_catalogue/@cwd_reference'
-	          ,[sequence_allelename] Varchar(20) 'sequence/alignmentreference/@allelename'
-	          ,[sequence_alleleid] Varchar(20) 'sequence/alignmentreference/@alleleid'
+	          ,[sequence_allelename] Varchar(30) 'sequence/alignmentreference/@allelename'
+	          ,[sequence_alleleid] Varchar(30) 'sequence/alignmentreference/@alleleid'
 	          ,[sequence_nucsequence] Varchar(Max) 'sequence/nucsequence' ) t
 
 	-- ====================================================================================================
@@ -115,13 +115,13 @@ Begin
 	       Into #features
 	    From Openxml(@xml_id ,'/alleles/allele/sequence/feature' ,2)
 	         With (
-               [allele_id] Varchar(20) '../../@id'
-	          ,[alignmentreference_allelename] Varchar(20) '../alignmentreference/@allelename'
-	          ,[alignmentreference_alleleid] Varchar(20) '../alignmentreference/@alleleid'
-	          ,[feature_id] Varchar(20) '@id'
+               [allele_id] Varchar(30) '../../@id'
+	          ,[alignmentreference_allelename] Varchar(30) '../alignmentreference/@allelename'
+	          ,[alignmentreference_alleleid] Varchar(30) '../alignmentreference/@alleleid'
+	          ,[feature_id] Varchar(30) '@id'
 	          ,[feature_order] Int '@order'
 	          ,[feature_type] Varchar(20) '@featuretype'
-	          ,[feature_name] Varchar(20) '@name'
+	          ,[feature_name] Varchar(30) '@name'
 	          ,[feature_status] Varchar(10) '@status'
 	          ,[SequenceCoordinates_start] Int 'SequenceCoordinates/@start'
 	          ,[SequenceCoordinates_end] Int 'SequenceCoordinates/@end'
