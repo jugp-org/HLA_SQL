@@ -16,7 +16,7 @@
     print 'Чтение данных FastQ'
     print '**************************************************'
     -- Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_29_20171002T164751Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-160_PCOS-54_IonXpress_054.fastq'
-    Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_27_hla_11_8-20170928T123327Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-153_PCOS-48_IonXpress_048.fastq'
+    Exec fastQ2_Data_read @file_name='C:\WORK\NGS\DATA\2017_09_27_hla_11_8-20170928T123327Z-001\R_2017_08_11_13_18_59_user_S5-00384-36-KIR_Kofiadi_bg_PCOS-11-08-17_2015HLA-158_PCOS-52_IonXpress_052.fastq'
     Go
 
     DBCC SHRINKFILE (N'DNA2_fastQ_log' , 0, TRUNCATEONLY)
