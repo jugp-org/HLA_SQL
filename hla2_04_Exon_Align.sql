@@ -107,12 +107,12 @@ Begin
                 Where 1=1
                     And f.[feature_status]='Complete'
                     And f.feature_type='Exon'
-                    And (
-                        (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
-                        Or 
-                        (f.feature_name In ('Exon 2','Exon 3') And (a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%'))
-                    )
-                -- Order By f.feature_name,a.allele_name
+                    And f.feature_name In ('Exon 2','Exon 3','Exon 4')
+                    --And (
+                    --    (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
+                    --    Or 
+                    --    (f.feature_name In ('Exon 2','Exon 3') And (a.allele_name Like 'HLA-DPB1*%' Or a.allele_name Like 'HLA-DRB1*%' Or a.allele_name Like 'HLA-DQB1*%'))
+                    --)
                 ) As t
         Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
         Where t.row_num=1
