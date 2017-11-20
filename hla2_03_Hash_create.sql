@@ -101,11 +101,14 @@ Begin
                 From hla_uexon_part ep With (Nolock)
                     Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=ep.uexon_iid
                 Where 1=1
-                    And (
-                        (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
-                        Or 
-                        (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
-                    )
+                    --And (
+                    --    (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
+                    --    Or 
+                    --    (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
+                    --    -- Для неклассических экзонов --
+                    --    Or 
+                    --    (ue.uexon_num In (2,3,4) And ue.gen_cd Not In ('A','B','C','DRB1','DQB1','DPB1'))
+                    --)
                 Group By ep.epart_hash
                 Order By ep.epart_hash
 
@@ -131,11 +134,14 @@ Begin
                 From hla_uexon_part ep With (Nolock)
                     Inner Join dna2_hla.dbo.hla_uexon ue With (Nolock) On ue.uexon_iid=ep.uexon_iid
                 Where 1=1
-                    And (
-                        (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
-                        Or 
-                        (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
-                    )
+                    --And (
+                    --    (ue.uexon_num In (2,3,4) And ue.gen_cd In ('A','B','C')) 
+                    --    Or 
+                    --    (ue.uexon_num In (2,3) And ue.gen_cd In ('DRB1','DQB1','DPB1'))
+                    --    -- Для неклассических экзонов --
+                    --    Or 
+                    --    (ue.uexon_num In (2,3,4) And ue.gen_cd Not In ('A','B','C','DRB1','DQB1','DPB1'))
+                    --)
                 Group By ep.epart_hash
                         ,ue.gen_cd
                         ,ue.uexon_num

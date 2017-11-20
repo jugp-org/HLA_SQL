@@ -17,6 +17,9 @@ Go
 Alter Procedure [dbo].[hla2_XML_read]
     @file_name  Varchar(Max)    = null
    ,@cXml       Varchar(Max)    = null
+   -- для записи версии данных
+   ,@file_create Datetime       = null
+   ,@file_size   Numeric(15)    = null
 As
 Begin
 	Set Nocount On;
@@ -46,6 +49,22 @@ Begin
         print '**************************************************'
         Select @cSql = 'select @cXml = cast(t.xData as varchar(max)) from openrowset(bulk '''+@file_name+''', single_clob) t(xData)';
         exec sp_executesql @cSql, N'@cXml varchar(max) output', @cXml output;
+        
+        -- запись версии файла
+        Truncate Table hla_version
+        Insert hla_version
+		(
+			[file_name]
+		   ,[file_create]
+		   ,[file_size]
+		   ,[file_loaded]
+		)
+		Select 
+			@file_name
+		   ,Isnull(@file_create,'19000101')
+		   ,Len(@cXml)
+		   ,Getdate()
+        					
         -- Select @cXml
     End
 
@@ -176,13 +195,16 @@ Begin
 	Select a.*
 	    From #features a
 
+
 	-- ==================================================
 	-- init
 	-- ==================================================
 	Update hla_features
         Set feature_len=Len([feature_nucsequence])
 
+-- Вынесено в процедуру hla2_XML_PostLoad_proc !!!!!!!
 
+/*
 	-- ==================================================
     -- Diff
 	-- ==================================================
@@ -323,5 +345,6 @@ Begin
     -- ==================================================
     Update hla_uexon
         Set uexon_len = Len(uexon_seq)
+*/        
 
 End

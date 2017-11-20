@@ -108,6 +108,7 @@ Begin
                     And f.[feature_status]='Complete'
                     And f.feature_type='Exon'
                     And f.feature_name In ('Exon 2','Exon 3','Exon 4')
+                    And Isnull(f.feature_nucsequence,'')<>''
                     --And (
                     --    (f.feature_name In ('Exon 2','Exon 3','Exon 4') And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%'))
                     --    Or 
