@@ -145,6 +145,24 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 --            And a.allele_name Like 'HLA-A*%'
         Order By a.allele_name,f.feature_name,f.alignmentreference_alleleid
 
+
+    -- Список уникальных длин экзонов 
+    -- в привязке к исходным данным
+    Select Distinct
+           f.feature_name
+          ,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+          ,e.uexon_len
+        From dna2_hla..hla_uexon e With (Nolock)
+            Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
+            Inner Join dna2_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+        Where 1=1
+--            and f.feature_name='Exon 2'
+--            And a.allele_name Like '%DPB%'
+--            And a.allele_name Like 'HLA-A*%'
+        Order By e.uexon_len
+                ,f.feature_name
+                ,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+
     -- Кол-во уникальных экзонов по каждому типу гена с точностью до аллели
     -- в привязке к исходным данным
     Select Substring(a.allele_name,1,Charindex(':',a.allele_name))
