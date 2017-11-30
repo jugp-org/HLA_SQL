@@ -145,6 +145,20 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 --            And a.allele_name Like 'HLA-A*%'
         Order By a.allele_name,f.feature_name,f.alignmentreference_alleleid
 
+    -- Проверка уникальности экзонов в пределеах одного гена
+    Select gen_cd,uexon_seq 
+        From hla_uexon
+        Group By gen_cd,uexon_seq 
+        having Count(*)>1
+
+    -- Проверка уникальности экзонов 
+    Select uexon_seq 
+            ,Min(gen_cd)
+            ,Max(gen_cd)
+        From hla_uexon
+        Group By uexon_seq 
+        having Count(*)>1
+
 
     -- Список уникальных длин экзонов 
     -- в привязке к исходным данным
@@ -162,6 +176,21 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Order By e.uexon_len
                 ,f.feature_name
                 ,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+
+    -- Поиск последовательности в уникальном экзоне
+    Declare @read_str Varchar(1024)
+    Select @read_str='AACACCCAAAGACACACGTGACCCACCATCCCGTCTCTGACCATGAGGCCACCCTGAGGTGCTGGGCCCTGGGCTTCTACCCTGCGGAGATCACACTGACCTGGCAGCGGGATGGCGAGGACCAAACTCAGGACACCGAGCTTGTGGAGACCAGGCCAGCAGGAGATGGAACCTTCCAGAAGTGGGCAGCTGTGGTGGTGCCTTCTGGAGAAGAGCAGAGATACACGTGCCATGTGCAGCACGAGGGGCTGCC.AGAGCCCCTCACCCTGAGATGGG'
+    Select @read_str='AACACCCAAAGACACACGTGACCCACCATCCCGTCTCTGACCATGAGGCCACCCTGAGGTGCTGGGCCCTGGGCTTCTACCCTGCGGAGATCACACTGACCTGGCAGCGGGATGGCGAGGACCAAACTCAGGACACCGAGCTTGTGGAGACCAGGCCAGCAGGAGATGGAACCTTCCAGAAGTGGGCAGCTGTGGTGGTGCCTTCTGGAGAAGAGCAGAGATACACGTGCCATGTGCAGCACGAGGGGCTGCCAGAGCCCCTCACCCTGAGATGGG'
+    Select 
+           f.feature_name
+          ,a.allele_name
+          ,e.*
+        From hla_uexon e With (Nolock)
+            Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
+            Inner Join dna2_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+        Where e.uexon_seq Like '%'+@read_str+'%'
+
+
 
     -- Кол-во уникальных экзонов по каждому типу гена с точностью до аллели
     -- в привязке к исходным данным
@@ -245,6 +274,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                 Having count(*)>1
         )
         Order by a.allele_name
+
 
 
     Select Count(*) From dna2_hla.dbo.hla_uexon_part
