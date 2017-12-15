@@ -92,6 +92,13 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
  Select @tid,@tsid
  
  */
+
+
+ -- ****************************************************************************************************
+ -- Hla3
+ -- ****************************************************************************************************
+ Select *
+    from 
  
  -- ****************************************************************************************************
  -- Экзоны
@@ -159,7 +166,25 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             And a.allele_name In ('HLA-B*07:02:45','HLA-B*07:161N')
         Order By a.allele_name,f.feature_name,f.alignmentreference_alleleid
 
-
+    -- Кол-во уникальных экзонов по экзонам и генам
+    -- в привязке к исходным данным
+    ;With _cte_ex As (
+        Select e.uexon_iid
+              ,exon_num = f.feature_name
+              ,gen_cd   = Substring(a.allele_name,1,Charindex('*',a.allele_name))
+            From dna2_hla.dbo.hla_uexon e With (Nolock)
+                Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq
+                Inner Join dna2_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id
+            Group By e.uexon_iid
+                ,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+                ,f.feature_name
+    ) 
+    Select Count(*)
+            ,exon_num 
+            ,gen_cd   
+        From _cte_ex
+        Group By exon_num,gen_cd  
+        Order By  gen_cd  , exon_num
 
     -- Проверка уникальности экзонов в пределеах одного гена
     Select gen_cd,uexon_seq 
@@ -196,7 +221,8 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     Declare @read_str Varchar(1024)
     Select @read_str='AACACCCAAAGACACACGTGACCCACCATCCCGTCTCTGACCATGAGGCCACCCTGAGGTGCTGGGCCCTGGGCTTCTACCCTGCGGAGATCACACTGACCTGGCAGCGGGATGGCGAGGACCAAACTCAGGACACCGAGCTTGTGGAGACCAGGCCAGCAGGAGATGGAACCTTCCAGAAGTGGGCAGCTGTGGTGGTGCCTTCTGGAGAAGAGCAGAGATACACGTGCCATGTGCAGCACGAGGGGCTGCC.AGAGCCCCTCACCCTGAGATGGG'
     Select @read_str='AACACCCAAAGACACACGTGACCCACCATCCCGTCTCTGACCATGAGGCCACCCTGAGGTGCTGGGCCCTGGGCTTCTACCCTGCGGAGATCACACTGACCTGGCAGCGGGATGGCGAGGACCAAACTCAGGACACCGAGCTTGTGGAGACCAGGCCAGCAGGAGATGGAACCTTCCAGAAGTGGGCAGCTGTGGTGGTGCCTTCTGGAGAAGAGCAGAGATACACGTGCCATGTGCAGCACGAGGGGCTGCCAGAGCCCCTCACCCTGAGATGGG'
-    Select @read_str='CACGTTTCTTGGAGCTGCTTAAGTCTGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGAGAGACACTTCCATAACCAGGAGGAGTACGCGCGCTTCGACAGCGACGTGGGGGAGTACCGGGCGGTGAGGGAGCTGGGGCGGCCTGATGCCGAGTACTGGAACAGCCAGAAGGACCTCCTGGAGCAGAAGCGGGGCCAGGTGGACAATTACTGCAGACACAACTACGGGGTTGGTGAGAGCTTCACAGTGCAGCGGCGAG'
+    Select @read_str='GCTCCCACTCCATGAAGTATTTCTTCACATCCGTGTCCCGGCCTGGCCGCGGAGAGCCCCGCTTCATCTCAGTGGGCTACGTGGACGACACGCAGTTCGTGCGGTTCGACAGCGACGCCGCGAGTCCGAGAGGGGAGCCGCGGGCGCCGTGGGTGGAGCAGGAGGGGCCGGAGTATTGGGACCGGGAGACACAGAAGTACAAGCGCCAGGCACAGACTGACCGAGTGAGCCTGCGGAACCTGCGCGGCTACTACAACCAGAGCGAGGCCG'
+
 
     Select 
            f.feature_name
@@ -206,10 +232,15 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             Inner Join dna2_hla.dbo.hla_features f With (Nolock) On f.feature_nucsequence = e.uexon_seq 
             Inner Join dna2_hla.dbo.[hla_alleles] a With (Nolock) On a.allele_id=f.allele_id And a.allele_name Like 'HLA-'+e.gen_cd+'%'
         Where 1=1
+            And f.feature_name='Exon 2'
             -- and e.uexon_seq Like '%'+@read_str+'%'
             -- And e.uexon_iid=1659
-            And a.allele_name Like '%DRB1*14:141%'
+            -- And a.allele_name Like '%HLA-C*01:02:01:01%'
+            -- And a.hla_g_group Like '%C*03:04:01G%'
+            And a.hla_g_group Like '%C*03:03:01G%'
 
+    Select *
+        from hla_fexon_align
 
 
     -- Кол-во уникальных экзонов по каждому типу гена с точностью до аллели
