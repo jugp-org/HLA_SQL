@@ -94,12 +94,91 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
  */
 
 
- -- ****************************************************************************************************
- -- Hla3
- -- ****************************************************************************************************
- Select *
-    from 
- 
+-- ****************************************************************************************************
+-- Hla3
+-- ****************************************************************************************************
+
+	-- Список экзонов с 
+	Select a.allele_name
+		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+		,a.hla_g_group
+		,f.*
+	From hla3_features f With (Nolock)
+ 		Inner Join hla3_alleles a With (Nolock)
+				On a.allele_id = f.allele_id
+	Where 1=1
+ 		--and (
+ 		--	(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
+ 		--	or
+ 		--	(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
+ 		--)
+ 		--And a.allele_name='HLA-G*01:01:04'	
+ 		And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCGG'
+ 		--And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCG*'
+ 		-- And f.feature_nucsequence Like '%CACGTTTCCTGTGGCAGCCTAAGAGGGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGACAGATACTTCTATAATCAGGAGGAGTCCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGACGCTGAGTACTGGAACAGCCAGAAGGACATCCTGGAGCAGGCGCGGGCCGCGGTGGACACCTACTGCAGACACAACTACGGGGTTGGTG________________________%'
+	Order By f.feature_name, a.allele_name  
+
+
+	-- Список экзонов с [*]
+	Select a.allele_name
+		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+		,f.*
+	From hla3_features f With (Nolock)
+ 		Inner Join hla3_alleles a With (Nolock)
+				On a.allele_id = f.allele_id
+	Where 1=1
+ 		and (
+ 			(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
+ 			or
+ 			(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
+ 			)
+ 		And Charindex('*',f.feature_nucsequence)>0
+ 		And Replace(f.feature_nucsequence,'*','')=''
+	Order By f.feature_name, a.allele_name  
+
+	-- Совпадение экзонов с [*] с любыми другими по маске
+	GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCGG
+	GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCG_
+	;With _cte_aster As (
+			Select a.allele_name
+				,a.allele_id
+				,f.feature_iid
+				,f.feature_name
+				,feature_nucsequence	= Replace(f.feature_nucsequence,'*','_')
+			From hla3_features f With (Nolock)
+ 				Inner Join hla3_alleles a With (Nolock)
+						On a.allele_id = f.allele_id
+			Where 1=1
+ 				and (
+ 					(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
+ 					or
+ 					(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
+ 					)
+ 				And Charindex('*',f.feature_nucsequence)>0
+ 				And Replace(f.feature_nucsequence,'*','')<>''
+	)
+	, _cte_uexon As (
+			Select Distinct f.feature_nucsequence
+			From hla3_features f With (Nolock)
+			Where 1=1
+ 				And Charindex('*',f.feature_nucsequence)=0
+	)
+	Select	
+			allele_name1	= t.allele_name
+			,allele_id1		= t.allele_id
+			,feature_id1	= t.feature_iid
+			,feature_seq1	= t.feature_nucsequence
+			,feature_name1	= t.feature_name
+			--,allele_name2	= a.allele_name
+			--,allele_id2		= a.allele_id
+			--,feature_id2	= f.feature_iid
+			,feature_seq2	= f.feature_nucsequence
+		From _cte_aster t
+ 		Inner Join hla3_alleles a With (Nolock)
+				On a.allele_id = t.allele_id
+		inner Join _cte_uexon f with (NoLock) On f.feature_nucsequence Like t.feature_nucsequence  
+	Order By t.feature_name, t.allele_name  
+	
  -- ****************************************************************************************************
  -- Экзоны
  -- ****************************************************************************************************
