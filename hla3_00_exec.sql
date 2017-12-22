@@ -59,7 +59,7 @@ Exec [hla3_Nuc_Read] @file_name=N'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\W_n
 Exec [hla3_Nuc_Read] @file_name=N'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\Y_nuc.txt', @fmt_name=@fmt_file, @exon_cnt=3
 
 -- ==================================================
--- Check
+-- Check alleles
 -- ==================================================
 Select a.*
     From hla3_alleles a

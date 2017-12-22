@@ -205,161 +205,175 @@ GO
     -- indexes
     Create Nonclustered Index [hla3_features_idx1] On [dbo].[hla3_features] ([allele_id] Asc)
     Create Nonclustered Index [hla3_features_idx2] On [dbo].[hla3_features] ([feature_type],[feature_name],[feature_status],[allele_id])
-
     Grant insert,update,delete,select on [hla3_features] to public
 
-    ---- ==================================================
-    ---- Экзоны для выравнивания
-    ---- Это экзоны первых аллелей для каждой длины экзона
-    ---- ==================================================
-    ---- drop table [hla3_fexon_align]
-    --Create Table [dbo].[hla3_fexon_align]
-    --(
-	   -- [fexon_iid]					    numeric(15) Not Null Identity (1,1)
-	   --,[uexon_iid]					    numeric(15)         -- ид. уникального экзона
-	   --,[allele_id]					    varchar(30)
-	   --,[allele_name]   			    varchar(50)
-    --   ,[gen_cd]                        varchar(10)         -- код гена HLA-A*, HLA-B*, HLA-C* ... 
-	   --,[exon_num]	    				numeric(2)          -- Номер экзона
-	   --,[exon_seq]					    varchar(max)        -- 
-	   --,[exon_len]	        		    Int                 -- Длина экзона
-    --)
-    --Go
-    ---- permissions
-    --Grant Insert,Update,Delete,Select On [hla3_fexon_align] To public
-    --go
 
-    ---- ==================================================
-    ---- Уникальные Экзоны
-    ---- ==================================================
-    ---- drop table hla3_uexon
-    ---- alter table [hla3_uexon] add [uexon_diff_seq] varchar(max) Null 
-    --Create Table [dbo].[hla3_uexon]
-    --(
-	   -- [uexon_iid]					    numeric(15) Not Null Identity (1,1)
-	   --,[uexon_half_iid]				Int
-	   --,[uexon_num]	    				numeric(2)              -- Номер экзона
-	   --,[uexon_seq]					    varchar(max)            -- 
-	   --,[uexon_len]	        		    Int                     -- Длина экзона
-    --   ,[gen_cd]                        varchar(10)             -- код гена HLA-A*, HLA-B*, HLA-C* ... 
-    --   ,[k_forward_back]				Smallint
-    --   ,[epart_cnt]                     numeric(10)     Null
-    --   ,[uexon_diff_seq]                varchar(max)    Null    -- 
-    --)
-    --Go
-    ---- permissions
-    --Grant Insert,Update,Delete,Select On hla3_uexon To public
-    --go
-    --Create Nonclustered Index [hla3_uexon_idx1] On [dbo].[hla3_uexon](uexon_iid)
-    --Create Nonclustered Index [hla3_uexon_idx2] On [dbo].[hla3_uexon](uexon_iid,k_forward_back)
-    --Go
-
-    ---- ==================================================
-    ---- Разбивка экзонов на части
-    ---- Формируется из hla3_uexon
-    ---- ==================================================
-    ---- drop table hla3_uexon_part
-    ---- alter table hla3_uexon_part drop column uexon_len
-    ---- alter table hla3_uexon_part add uexon_len Smallint Null
-    ---- alter table hla3_uexon_part add epart_cnt Smallint Null
-    ---- alter table hla3_uexon_part add [k_forward_back]    Smallint    Null
-    --Create Table [dbo].[hla3_uexon_part]
-    --(
-	   -- [epart_iid]         numeric(15) Not Null Identity (1,1)
-	   --,[uexon_iid]  	    numeric(15)
-	   --,[epart_hash]        Int
-	   --,[epart_pos]         Int
-    --   ,[uexon_len]         Smallint    Null
-    --   ,[epart_cnt]         SmallInt    Null
-    --   ,[k_forward_back]    Smallint    Null
-
-    --)
-    --Go
-    ---- permissions
-    ---- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
-    --Grant Insert,Update,Delete,Select On [hla3_uexon_part] To public
-    --go
-    --Create Nonclustered Index [hla3_uexon_part_idx1] On [dbo].[hla3_uexon_part](epart_hash,epart_pos)
-    --Create Nonclustered Index [hla3_uexon_part_idx2] On [dbo].[hla3_uexon_part](uexon_iid,epart_pos)
-    --Go
-
-    ---- ==================================================
-    ---- Уникальные части [hla3_uexon_part]
-    ---- Формируется из hla3_uexon_part
-    ---- drop table [hla3_uexon_upart]
-    ---- ==================================================
-    --Create Table [dbo].[hla3_uexon_upart]
-    --(
-	   -- [eupart_iid]        numeric(15) Not Null Identity (1,1)
-	   --,[epart_hash]        Int
-	   --,[epart_seq]         varchar(12)
-    --)
-    --Go
-    ---- permissions
-    ---- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
-    --Grant Insert,Update,Delete,Select On [hla3_uexon_upart] To public
-    --go
-    --Create Nonclustered Index [hla3_uexon_upart_idx1] On [dbo].[hla3_uexon_upart](epart_hash)
-    --Create Nonclustered Index [hla3_uexon_upart_idx2] On [dbo].[hla3_uexon_upart](epart_seq)
-    --Go
+    -- ==================================================
+    -- Уникальные Экзоны
+    -- ==================================================
+    -- drop table hla3_uexon
+    -- alter table [hla3_uexon] add [uexon_diff_seq] varchar(max) Null 
+    Create Table [dbo].[hla3_uexon]
+    (
+	    [uexon_iid]					    numeric(15) Not Null Identity (1,1)
+	   ,[uexon_uid]					    numeric(15)             -- Уникальный ид. экpона - одинаковый для одинаковых последовательностей и прямого обратного экзона
+	   ,[uexon_half_iid]				Int                     -- Ид. одинаковый для двух половинок, для прямого экзона совпадает с uexon_iid
+	   ,[uexon_num]	    				numeric(2)              -- Номер экзона
+	   ,[uexon_seq]					    varchar(max)            -- 
+	   ,[uexon_len]	        		    Int                     -- Длина экзона
+       ,[gen_cd]                        varchar(10)             -- код гена HLA-A*, HLA-B*, HLA-C* ... 
+       ,[k_forward_back]				Smallint
+       ,[epart_cnt]                     numeric(10)     Null
+       ,[uexon_diff_seq]                varchar(max)    Null    -- 
+    )
+    Go
+    -- permissions
+    Grant Insert,Update,Delete,Select On hla3_uexon To public
+    go
+    Create Nonclustered Index [hla3_uexon_idx1] On [dbo].[hla3_uexon](uexon_iid)
+    Create Nonclustered Index [hla3_uexon_idx2] On [dbo].[hla3_uexon](uexon_iid,k_forward_back)
+    Go
 
 
-    ---- ==================================================
-    ---- Уникальные части [hla3_uexon_part]
-    ---- с точностью до гена и номер аэкзона
-    ---- Формируется из hla3_uexon_part
-    ---- drop table [hla3_uexon_upartg]
-    ---- alter table [hla3_uexon_ugpart] add [k_dbl] Smallint Null
-    ---- alter table [hla3_uexon_ugpart] add [uexon_cnt] int Null
-    ---- ==================================================
-    --Create Table [dbo].[hla3_uexon_ugpart]
-    --(
-	   -- [eupart_iid]        numeric(15) Not Null Identity (1,1)
-	   --,[epart_hash]        Int
-	   --,[epart_seq]         varchar(12)
-    --   ,[gen_cd]            varchar(10)
-    --   ,[uexon_num]         Smallint
-    --   ,[k_dbl]             Smallint        -- Ключ принадлежности разным экзонам/генам
-    --   ,[uexon_cnt]         Int             -- Кол-во экзонов в которых найдена часть
-    --)
-    --Go
-    ---- permissions
-    ---- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
-    --Grant Insert,Update,Delete,Select On [hla3_uexon_ugpart] To public
-    --go
-    --Create Nonclustered Index [hla3_uexon_ugpart_idx1] On [dbo].[hla3_uexon_ugpart](epart_hash)
-    --Create Nonclustered Index [hla3_uexon_ugpart_idx2] On [dbo].[hla3_uexon_ugpart](epart_seq)
-    --Go
+    -- ==================================================
+    -- Экзоны для выравнивания
+    -- Это экзоны первых аллелей для каждой длины экзона
+    -- ==================================================
+    -- drop table [hla3_fexon_align]
+    Create Table [dbo].[hla3_fexon_align]
+    (
+	    [fexon_iid]					    numeric(15) Not Null Identity (1,1)
+	   ,[uexon_iid]					    numeric(15)         -- ид. уникального экзона
+	   ,[allele_id]					    varchar(30)
+	   ,[allele_name]   			    varchar(50)
+       ,[gen_cd]                        varchar(10)         -- код гена HLA-A*, HLA-B*, HLA-C* ... 
+	   ,[exon_num]	    				numeric(2)          -- Номер экзона
+	   ,[exon_seq]					    varchar(max)        -- 
+	   ,[exon_len]	        		    Int                 -- Длина экзона
+    )
+    Go
+    -- permissions
+    Grant Insert,Update,Delete,Select On [hla3_fexon_align] To public
+    go
 
 
 
-    ---- Таблица разбивки с каждого символа
-    ---- drop table hla3_uexon_part2
-    --Create Table [dbo].[hla3_uexon_part2]
-    --(
-	   -- [epart_iid]     numeric(15) Not Null Identity (1,1)
-	   --,[uexon_iid]  	numeric(15)
-	   --,[epart_hash]    int
-	   --,[epart_pos]     int
-    --)
-    --Go
-    ---- permissions
-    --Grant Insert,Update,Delete,Select On [hla3_uexon_part2] To public
-    --go
-    --Create Nonclustered Index [hla3_uexon_part2_idx1] On [dbo].[hla3_uexon_part2](epart_hash,epart_pos)
-    --Create Nonclustered Index [hla3_uexon_part2_idx2] On [dbo].[hla3_uexon_part2](uexon_iid)
-    --Go
 
 
-    ---- Версия загруженных данных HLA.XML
-    --Create Table [dbo].[hla3_version]
-    --(
-	   -- [file_name]     Varchar(250)
-	   --,[file_create]  	datetime
-	   --,[file_size]  	Numeric(15)
-	   --,[file_loaded]   datetime
-    --)
-    --Go
-    ---- permissions
-    --Grant Insert,Update,Delete,Select On [hla3_version] To public
-    --Go
+
+
+
+
+
+
+
+
+
+
+
+    -- ==================================================
+    -- Разбивка экзонов на части
+    -- Формируется из hla3_uexon
+    -- ==================================================
+    -- drop table hla3_uexon_part
+    -- alter table hla3_uexon_part drop column uexon_len
+    -- alter table hla3_uexon_part add uexon_len Smallint Null
+    -- alter table hla3_uexon_part add epart_cnt Smallint Null
+    -- alter table hla3_uexon_part add [k_forward_back]    Smallint    Null
+    Create Table [dbo].[hla3_uexon_part]
+    (
+	    [epart_iid]         numeric(15) Not Null Identity (1,1)
+	   ,[uexon_iid]  	    numeric(15)
+	   ,[epart_hash]        Int
+	   ,[epart_pos]         Int
+       ,[uexon_len]         Smallint    Null
+       ,[epart_cnt]         SmallInt    Null
+       ,[k_forward_back]    Smallint    Null
+
+    )
+    Go
+    -- permissions
+    -- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
+    Grant Insert,Update,Delete,Select On [hla3_uexon_part] To public
+    go
+    Create Nonclustered Index [hla3_uexon_part_idx1] On [dbo].[hla3_uexon_part](epart_hash,epart_pos)
+    Create Nonclustered Index [hla3_uexon_part_idx2] On [dbo].[hla3_uexon_part](uexon_iid,epart_pos)
+    Go
+
+    -- ==================================================
+    -- Уникальные части [hla3_uexon_part]
+    -- Формируется из hla3_uexon_part
+    -- drop table [hla3_uexon_upart]
+    -- ==================================================
+    Create Table [dbo].[hla3_uexon_upart]
+    (
+	    [eupart_iid]        numeric(15) Not Null Identity (1,1)
+	   ,[epart_hash]        Int
+	   ,[epart_seq]         varchar(12)
+    )
+    Go
+    -- permissions
+    -- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
+    Grant Insert,Update,Delete,Select On [hla3_uexon_upart] To public
+    go
+    Create Nonclustered Index [hla3_uexon_upart_idx1] On [dbo].[hla3_uexon_upart](epart_hash)
+    Create Nonclustered Index [hla3_uexon_upart_idx2] On [dbo].[hla3_uexon_upart](epart_seq)
+    Go
+
+
+    -- ==================================================
+    -- Уникальные части [hla3_uexon_part]
+    -- с точностью до гена и номер аэкзона
+    -- Формируется из hla3_uexon_part
+    -- drop table [hla3_uexon_upartg]
+    -- alter table [hla3_uexon_ugpart] add [k_dbl] Smallint Null
+    -- alter table [hla3_uexon_ugpart] add [uexon_cnt] int Null
+    -- ==================================================
+    Create Table [dbo].[hla3_uexon_ugpart]
+    (
+	    [eupart_iid]        numeric(15) Not Null Identity (1,1)
+	   ,[epart_hash]        Int
+	   ,[epart_seq]         varchar(12)
+       ,[gen_cd]            varchar(10)
+       ,[uexon_num]         Smallint
+       ,[k_dbl]             Smallint        -- Ключ принадлежности разным экзонам/генам
+       ,[uexon_cnt]         Int             -- Кол-во экзонов в которых найдена часть
+    )
+    Go
+    -- permissions
+    -- drop index hla3_uexon_part_idx2 on [hla3_uexon_part]
+    Grant Insert,Update,Delete,Select On [hla3_uexon_ugpart] To public
+    go
+    Create Nonclustered Index [hla3_uexon_ugpart_idx1] On [dbo].[hla3_uexon_ugpart](epart_hash)
+    Create Nonclustered Index [hla3_uexon_ugpart_idx2] On [dbo].[hla3_uexon_ugpart](epart_seq)
+    Go
+
+    -- Таблица разбивки с каждого символа
+    -- drop table hla3_uexon_part2
+    Create Table [dbo].[hla3_uexon_part2]
+    (
+	    [epart_iid]     numeric(15) Not Null Identity (1,1)
+	   ,[uexon_iid]  	numeric(15)
+	   ,[epart_hash]    int
+	   ,[epart_pos]     int
+    )
+    Go
+    -- permissions
+    Grant Insert,Update,Delete,Select On [hla3_uexon_part2] To public
+    go
+    Create Nonclustered Index [hla3_uexon_part2_idx1] On [dbo].[hla3_uexon_part2](epart_hash,epart_pos)
+    Create Nonclustered Index [hla3_uexon_part2_idx2] On [dbo].[hla3_uexon_part2](uexon_iid)
+    Go
+
+    -- Версия загруженных данных HLA.XML
+    Create Table [dbo].[hla3_version]
+    (
+	    [file_name]     Varchar(250)
+	   ,[file_create]  	datetime
+	   ,[file_size]  	Numeric(15)
+	   ,[file_loaded]   datetime
+    )
+    Go
+    -- permissions
+    Grant Insert,Update,Delete,Select On [hla3_version] To public
+    Go

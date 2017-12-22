@@ -254,7 +254,8 @@ GO
     Create Table [dbo].[hla_uexon]
     (
 	    [uexon_iid]					    numeric(15) Not Null Identity (1,1)
-	   ,[uexon_half_iid]				Int
+	   ,[uexon_uid]					    numeric(15)             -- Уникальный ид. экpона - одинаковый для одинаковых последовательностей и прямого обратного экзона
+	   ,[uexon_half_iid]				Int                     -- Ид. одинаковый для двух половинок, для прямого экзона совпадает с uexon_iid
 	   ,[uexon_num]	    				numeric(2)              -- Номер экзона
 	   ,[uexon_seq]					    varchar(max)            -- 
 	   ,[uexon_len]	        		    Int                     -- Длина экзона
@@ -348,8 +349,6 @@ GO
     Create Nonclustered Index [hla_uexon_ugpart_idx2] On [dbo].[hla_uexon_ugpart](epart_seq)
     Go
 
-
-
     -- Таблица разбивки с каждого символа
     -- drop table hla_uexon_part2
     Create Table [dbo].[hla_uexon_part2]
@@ -366,7 +365,6 @@ GO
     Create Nonclustered Index [hla_uexon_part2_idx1] On [dbo].[hla_uexon_part2](epart_hash,epart_pos)
     Create Nonclustered Index [hla_uexon_part2_idx2] On [dbo].[hla_uexon_part2](uexon_iid)
     Go
-
 
     -- Версия загруженных данных HLA.XML
     Create Table [dbo].[hla_version]

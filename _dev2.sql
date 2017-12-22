@@ -215,11 +215,22 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
                 ,a.allele_name
                 ,f.feature_nucsequence
 
+
+    -- Список уникальных экзонов 
+    Select e.*
+        From dna2_hla.dbo.hla_uexon e With (Nolock)
+        Where 1=1
+           -- And e.uexon_seq='CACGTTTCTTGGAGCTGCTTAAGTCTGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGAGAGACACTTCCATAACCAGGAGGAGTACGCGCGCTTCGACAGCGACGTGGGGGAGTACCGGGCGGTGAGGGAGCTGGGGCGGCCTGATGCCGAGTACTGGAACAGCCAGAAGGACCTCCTGGAGCAGAAGCGGGGCCAGGTGGACAATTACTGCAGACACAACTACGGGGTTGGTGAGAGCTTCACAGTGCAGCGGCGAG'
+           And e.uexon_uid=2448
+        Order By e.uexon_iid
+
+
     -- Список уникальных экзонов 
     -- в привязке к исходным данным
     Select f.allele_id
           ,f.feature_name
           ,a.allele_name
+          ,a.hla_g_group
           ,e.uexon_len
           ,e.*
         From dna2_hla..hla_uexon e With (Nolock)
@@ -229,6 +240,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 --            and f.feature_name='Exon 2'
 --            And a.allele_name Like '%DPB%'
 --            And a.allele_name Like 'HLA-A*%'
+                And a.allele_name Like '%DRB1*14:141%'
         Order By a.allele_name,f.feature_name,f.alignmentreference_alleleid
 
     -- Список уникальных экзонов для аллелей
@@ -272,12 +284,27 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         having Count(*)>1
 
     -- Проверка уникальности экзонов 
-    Select uexon_seq 
+    Select Max(uexon_uid)
+            ,uexon_seq 
             ,Min(gen_cd)
             ,Max(gen_cd)
+            ,Count(*)
         From hla_uexon
+        Where k_forward_back=1
         Group By uexon_seq 
         having Count(*)>1
+
+    Select uexon_uid
+            ,Min(gen_cd)
+            ,Max(gen_cd)
+            ,Count(*)
+        From hla_uexon
+        Where k_forward_back=1
+        Group By uexon_uid
+        having Count(*)>1
+        Order By uexon_uid
+
+
 
     -- Список уникальных длин экзонов 
     -- в привязке к исходным данным

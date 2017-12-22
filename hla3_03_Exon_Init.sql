@@ -18,12 +18,56 @@ Begin
             ,@exon_name varchar(50)
             ,@exon_seq  Varchar(Max)
 
+
+	-- ==================================================
+	-- Уникальные экзоны
+	-- ==================================================
+    Print '=================================================='
+    Print '*** Инициализация hla3_uexon'
+    Truncate Table hla3_uexon
+
+    Insert Into hla3_uexon
+        (uexon_num
+        ,uexon_seq
+        ,gen_cd
+        ,uexon_uid)
+        Select Case 
+                    when f.feature_name='Exon 2' then 2
+                    when f.feature_name='Exon 3' then 3
+                    when f.feature_name='Exon 4' then 4
+                End
+			,f.feature_nucsequence
+            ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
+            -- Установить ид. уникальных последовательностей uexon_uid
+            ,Rank() Over (Order by f.feature_name,f.feature_nucsequence) as uexon_uid      
+			From hla3_features f
+			Inner Join hla3_alleles a On a.allele_id=f.allele_id          
+			where 1=1
+				and f.feature_type ='Exon'
+				and f.feature_name in ('Exon 2','Exon 3','Exon 4')
+				and f.[feature_status]='Complete'
+				And Isnull(f.feature_nucsequence,'')<>''
+				-- And a.release_confimed='Confirmed'
+			Group by f.feature_name
+                    ,f.feature_nucsequence
+                    ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
+            Order By f.feature_name
+                    ,f.feature_nucsequence
+                    ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
+
+    -- Это все первые половинки
+    Update hla3_uexon
+        Set uexon_half_iid	= uexon_iid
+        	,k_forward_back	= 1
+
+    
+
+
 	-- ==================================================
 	-- init feature_len
 	-- ==================================================
-	Update hla_features
+	Update hla3_features
         Set feature_len=Len([feature_nucsequence])
-
 
 	-- ==================================================
     -- Diff
@@ -44,8 +88,8 @@ Begin
                     ,exon_name      = f.feature_name
                     ,exon_seq       = f.feature_nucsequence
                     ,row_num        = Row_number() Over(Partition By f.feature_name,Substring(a.allele_name,1,Charindex('*',a.allele_name)) Order By f.feature_name,a.allele_name) 
-                From DNA2_HLA.dbo.hla_features f With (Nolock) 
-                    Inner Join DNA2_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+                From DNA2_HLA.dbo.hla3_features f With (Nolock) 
+                    Inner Join DNA2_HLA.dbo.hla3_alleles a With (Nolock) On a.allele_id=f.allele_id
                 Where 1=1
                     And f.[feature_status]='Complete'
                     And f.feature_type='Exon'
@@ -57,7 +101,7 @@ Begin
                     --)
                     And Isnull(f.feature_nucsequence,'')<>''
                 ) As t
-        Inner Join DNA2_HLA.dbo.hla_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
+        Inner Join DNA2_HLA.dbo.hla3_uexon ue With (Nolock) On ue.uexon_seq=t.exon_seq
         Where t.row_num=1
     Order By t.allele_name,t.exon_name
 
@@ -82,10 +126,10 @@ Begin
             
         Print '*** Обработка:'+@all_name+' '+@exon_name
         -- Список аллелей для каждого экзона , пронумерованных по порядку
-        Update DNA2_HLA.dbo.hla_features
+        Update DNA2_HLA.dbo.hla3_features
             Set feature_diff_first=dbo.sql_str_distance_sdiff_from_point(f.feature_nucsequence,@exon_seq,1,1)
-            From DNA2_HLA.dbo.hla_features f With (Nolock) 
-                Inner Join DNA2_HLA.dbo.hla_alleles a With (Nolock) On a.allele_id=f.allele_id
+            From DNA2_HLA.dbo.hla3_features f With (Nolock) 
+                Inner Join DNA2_HLA.dbo.hla3_alleles a With (Nolock) On a.allele_id=f.allele_id
             Where 1=1
                 And Substring(a.allele_name,1,Len(@all_name)) = @all_name
                 And f.[feature_status]='Complete'
@@ -101,53 +145,12 @@ Begin
     End
 
 
-	-- ==================================================
-	-- Уникальные экзоны
-	-- ==================================================
-    Print '=================================================='
-    Print '*** Инициализация hla_uexon'
-    Truncate Table hla_uexon
 
-    Insert Into hla_uexon
-        (uexon_num
-        ,uexon_seq
-        ,gen_cd
-        ,uexon_uid)
-        Select Case 
-                    when f.feature_name='Exon 2' then 2
-                    when f.feature_name='Exon 3' then 3
-                    when f.feature_name='Exon 4' then 4
-                End
-			,f.feature_nucsequence
-            ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
-            -- Установить ид. уникальных последовательностей uexon_uid
-            ,Rank() Over (Order by f.feature_name,f.feature_nucsequence) as uexon_uid      
-			From hla_features f
-			Inner Join hla_alleles a On a.allele_id=f.allele_id          
-			where 1=1
-				and f.feature_type ='Exon'
-				and f.feature_name in ('Exon 2','Exon 3','Exon 4')
-				and f.[feature_status]='Complete'
-				And Isnull(f.feature_nucsequence,'')<>''
-				-- And a.release_confimed='Confirmed'
-			Group by f.feature_name
-                    ,f.feature_nucsequence
-                    ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
-            Order By f.feature_name
-                    ,f.feature_nucsequence
-                    ,Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
-
-    -- Это все первые половинки
-    Update hla_uexon
-        Set uexon_half_iid	= uexon_iid
-        	,k_forward_back	= 1
-
-    
 
 
     Print '=================================================='
     Print '*** Добавить комплиментарные половинки'
-    Insert Into hla_uexon
+    Insert Into hla3_uexon
         (uexon_num, gen_cd, uexon_seq, k_forward_back, uexon_half_iid,uexon_uid)
         Select
 			u.uexon_num
@@ -156,10 +159,10 @@ Begin
             ,2
             ,u.uexon_half_iid
             ,u.uexon_uid
-        From hla_uexon u
+        From hla3_uexon u
 
 	-- Перевернули
-    Update hla_uexon
+    Update hla3_uexon
         Set uexon_seq	= REVERSE(uexon_seq)
         Where k_forward_back = 2
 
@@ -168,7 +171,7 @@ Begin
     -- T->2->A
     -- C->3->G
     -- G->4->C
-    Update hla_uexon
+    Update hla3_uexon
         Set uexon_seq	= Replace(Replace(Replace(Replace(Replace(Replace(Replace(Replace(uexon_seq,'A','1'),'T','2'),'C','3'),'G','4'),'1','T'),'2','A'),'3','G'),'4','C')
         Where k_forward_back = 2
 
@@ -176,7 +179,7 @@ Begin
     -- ==================================================
     -- Длина 
     -- ==================================================
-    Update hla_uexon
+    Update hla3_uexon
         Set uexon_len = Len(uexon_seq)
 
 

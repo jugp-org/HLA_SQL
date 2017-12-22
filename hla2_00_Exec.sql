@@ -10,7 +10,7 @@ Go
     -- ==================================================
     -- Прочитать файл XLA
     -- ==================================================
-    exec hla2_XML_read @file_name='C:\WORK\NGS\DATA\hla.xml\hla.xml'
+    exec hla2_XML_read @file_name='C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\hla.xml\hla.xml'
     Go
 
     DBCC SHRINKFILE (N'DNA2_HLA_log' , 0, TRUNCATEONLY)
