@@ -322,12 +322,18 @@ Begin
         From #nuc_exon ne
         Inner Join hla3_alleles a With (Nolock) On a.allele_name=ne.allele_name
 
+	-- ==================================================
+	-- init feature
+	-- ==================================================
     Update hla3_features
         Set feature_id = Cast(feature_iid As Varchar(50))
 
     Update hla3_features
         Set [feature_status] = 'UnComplete'
         Where charindex('*',feature_nucsequence)>0
+
+	Update hla3_features
+        Set feature_len=Len([feature_nucsequence])
 
 
 /*

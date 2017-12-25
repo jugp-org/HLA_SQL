@@ -257,29 +257,11 @@ GO
     go
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     -- ==================================================
     -- Разбивка экзонов на части
     -- Формируется из hla3_uexon
     -- ==================================================
     -- drop table hla3_uexon_part
-    -- alter table hla3_uexon_part drop column uexon_len
-    -- alter table hla3_uexon_part add uexon_len Smallint Null
-    -- alter table hla3_uexon_part add epart_cnt Smallint Null
-    -- alter table hla3_uexon_part add [k_forward_back]    Smallint    Null
     Create Table [dbo].[hla3_uexon_part]
     (
 	    [epart_iid]         numeric(15) Not Null Identity (1,1)
