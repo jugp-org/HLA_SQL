@@ -174,7 +174,7 @@ GO
     -- Разбиение аллелей на экзоны
     -- ==================================================
     CREATE TABLE [dbo].[hla3_features](
-	    [allele_id]					    varchar(30),
+	    [allele_iid]				    Int,
 	    [feature_iid]				    int identity,
 	    [feature_id]				    varchar(30) Null,
 	    [feature_type]				    varchar(20),
@@ -203,8 +203,8 @@ GO
     ) 
 
     -- indexes
-    Create Nonclustered Index [hla3_features_idx1] On [dbo].[hla3_features] ([allele_id] Asc)
-    Create Nonclustered Index [hla3_features_idx2] On [dbo].[hla3_features] ([feature_type],[feature_name],[feature_status],[allele_id])
+    Create Nonclustered Index [hla3_features_idx1] On [dbo].[hla3_features] ([allele_iid] Asc)
+    Create Nonclustered Index [hla3_features_idx2] On [dbo].[hla3_features] ([feature_type],[feature_name],[feature_status],[allele_iid])
     Grant insert,update,delete,select on [hla3_features] to public
 
 
@@ -244,7 +244,7 @@ GO
     (
 	    [fexon_iid]					    numeric(15) Not Null Identity (1,1)
 	   ,[uexon_iid]					    numeric(15)         -- ид. уникального экзона
-	   ,[allele_id]					    varchar(30)
+	   ,[allele_iid]				    numeric(15)
 	   ,[allele_name]   			    varchar(50)
        ,[gen_cd]                        varchar(10)         -- код гена HLA-A*, HLA-B*, HLA-C* ... 
 	   ,[exon_num]	    				numeric(2)          -- Номер экзона

@@ -41,7 +41,7 @@ Begin
                 -- ”становить ид. уникальных последовательностей uexon_uid
                 ,Rank() Over (Order by f.feature_name,f.feature_nucsequence) as uexon_uid      
 			From hla3_features f
-			Inner Join hla3_alleles a On a.allele_id=f.allele_id          
+			Inner Join hla3_alleles a On a.allele_iid=f.allele_iid
 			where 1=1
 				and f.feature_type ='Exon'
 				and f.feature_name in ('Exon 2','Exon 3','Exon 4')

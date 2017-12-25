@@ -46,6 +46,18 @@ Exec [hla3_Nuc_Read] @file_name=N'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\W_n
 Exec [hla3_Nuc_Read] @file_name=N'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\Y_nuc.txt', @fmt_name=@fmt_file, @exon_cnt=3
 
 -- ==================================================
+-- Загрузка ид. аллелей
+-- ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/Allelelist.txt
+-- ==================================================
+Declare @fmt_file    Varchar(250)
+Select @fmt_file    = 'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\_allele.fmt'
+
+exec hla3_Allele_Read
+     @file_name  = 'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\Allelelist.txt'
+    ,@fmt_name  = @fmt_file
+
+
+-- ==================================================
 -- Загрузка групп аллелей
 -- ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/wmda/
 -- ==================================================

@@ -106,8 +106,6 @@ Begin
     Insert Into hla3_alleles (allele_name)
         Select allele_name
         From #nuc_seq
-    Update hla3_alleles
-        Set allele_id = Cast(allele_iid As Varchar(50))
 
     -- ==================================================
     -- Цикл по кускам аллелей
@@ -307,14 +305,14 @@ Begin
     -- Записать в основную таблицу экзонов
     -- ==================================================
     Insert Into hla3_features (
-        [allele_id]
+        [allele_iid]
 	    ,[feature_type]
 	    ,[feature_name]
 	    ,[feature_status]
 	    ,[feature_nucsequence]
         )
     Select 
-            a.allele_id
+            a.allele_iid
             ,'Exon'
             ,'Exon '+Cast(ne.exon_num As Varchar(1))
             ,'Complete'

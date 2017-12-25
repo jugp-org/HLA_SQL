@@ -34,14 +34,14 @@ Begin
 
     -- Список первых аллелей для каждого экзона, на которые будем потом выравнивать 
     Insert [hla3_fexon_align] (
-	    [allele_id]
+	    [allele_iid]
 	   ,[allele_name]
        ,[gen_cd]
 	   ,[exon_num]
 	   ,[exon_seq]
        ,[uexon_iid]
     )
-    Select t.allele_id
+    Select t.allele_iid
             ,t.allele_name
             ,t.gen_cd
 	        ,t.exon_num
@@ -50,14 +50,14 @@ Begin
         From (
             -- Список аллелей для каждого экзона, пронумерованных по порядку
             Select a.allele_name
-                    ,allele_id      = a.allele_id
+                    ,allele_iid     = a.allele_iid
                     ,gen_cd         = Replace(Substring(a.allele_name,1,Charindex('*',a.allele_name)-1),'HLA-','')
                     ,exon_num       = Cast(Replace(f.feature_name,'Exon','') As Numeric(2))
                     ,exon_seq       = f.feature_nucsequence
                     ,exon_len       = f.feature_len
                     ,row_num        = Row_number() Over(Partition By f.feature_name,Substring(a.allele_name,1,Charindex('*',a.allele_name)) Order By f.feature_name,a.allele_name) 
                 From dna2_hla.dbo.hla3_features f With (Nolock) 
-                    Inner Join dna2_hla.dbo.hla3_alleles a With (Nolock) On a.allele_id=f.allele_id
+                    Inner Join dna2_hla.dbo.hla3_alleles a With (Nolock) On a.allele_iid=f.allele_iid
                 Where 1=1
                     And f.[feature_status]='Complete'
                     And f.feature_type='Exon'

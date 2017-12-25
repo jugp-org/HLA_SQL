@@ -10,12 +10,12 @@ Select a.*
 Select a.allele_name
         ,f.*
     From hla3_alleles a
-    Inner Join hla3_features f With (Nolock) On f.allele_id=a.allele_iid
+    Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid
     Order By a.allele_name
 
 -- Проверка на HLA базу
 -- Список уникальных экзонов 
--- в привязке к исходным данным
+-- в привязке к исходным данным HLA2
 Select f.allele_id
         ,a.allele_name
         ,f.feature_name
@@ -30,46 +30,11 @@ Select f.allele_id
             on 1=1
             And ne.feature_name=f.feature_name
             And ne.feature_nucsequence=f.feature_nucsequence 
-            And ne.allele_id=na.allele_id
+            And ne.allele_iid=na.allele_iid
     Where 1=1
             -- And (a.allele_name Like 'HLA-A*%' Or a.allele_name Like 'HLA-B*%' Or a.allele_name Like 'HLA-C*%')
             And f.feature_name In ('Exon 2','Exon 3','Exon 4')
-            And Isnull(na.allele_name,'')=''
-            --And na.allele_name In (
-            --    'HLA-A*03:200Q'
-            --    ,'HLA-A*03:200Q'
-            --    ,'HLA-A*03:200Q'
-            --    ,'HLA-A*03:260'
-            --    ,'HLA-A*03:260'
-            --    ,'HLA-A*03:260'
-            --    ,'HLA-A*33:03:01'
-            --    ,'HLA-A*33:03:01'
-            --    ,'HLA-A*33:03:01'
-            --    ,'HLA-B*15:30'
-            --    ,'HLA-B*15:30'
-            --    ,'HLA-B*15:30'
-            --    ,'HLA-B*18:131'
-            --    ,'HLA-B*18:131'
-            --    ,'HLA-B*18:131'
-            --    ,'HLA-B*27:12'
-            --    ,'HLA-B*27:12'
-            --    ,'HLA-B*27:12'
-            --    ,'HLA-B*37:01:01'
-            --    ,'HLA-B*37:01:01'
-            --    ,'HLA-B*37:01:01'
-            --    ,'HLA-B*40:298'
-            --    ,'HLA-B*40:298'
-            --    ,'HLA-B*52:21'
-            --    ,'HLA-B*52:21'
-            --    ,'HLA-B*57:01:01'
-            --    ,'HLA-B*57:01:01'
-            --    ,'HLA-B*57:01:01'
-            --    ,'HLA-C*07:04:02'
-            --    ,'HLA-C*07:04:02'
-            --    ,'HLA-C*07:04:02'
-            --    ,'HLA-C*07:109'
-            --    ,'HLA-C*07:109'
-            --)
+            --And Isnull(na.allele_name,'')=''
     Order By a.allele_name,f.feature_name,f.alignmentreference_alleleid 
 
 
@@ -101,10 +66,11 @@ Select *
 Select a.allele_name
         ,a.hla_g_group
         ,a.hla_p_group
+        ,a.allele_id
         ,ue.*
     From hla3_uexon ue
         Inner Join hla3_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-        Inner Join hla3_alleles a With (Nolock) On a.allele_id=f.allele_id And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
+        Inner Join hla3_alleles a With (Nolock) On a.allele_iid=f.allele_iid And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
     Where 1=1
         And a.allele_name Like 'HLA-A*%'
         And ue.uexon_num=3
