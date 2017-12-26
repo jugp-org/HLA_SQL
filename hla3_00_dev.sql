@@ -69,11 +69,12 @@ Select a.allele_name
         ,a.allele_id
         ,ue.*
     From hla3_uexon ue
-        Inner Join hla3_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-        Inner Join hla3_alleles a With (Nolock) On a.allele_iid=f.allele_iid And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
+        Left Join hla3_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
+        Left Join hla3_alleles a With (Nolock) On a.allele_iid=f.allele_iid And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
     Where 1=1
-        And a.allele_name Like 'HLA-A*%'
-        And ue.uexon_num=3
+        --And a.allele_name Like 'HLA-A*%'
+        --And ue.uexon_num=3
+        And ue.uexon_half_iid=15262
     Order By 
         a.allele_name
         ,f.feature_name
@@ -113,6 +114,14 @@ Select Count(*)
     From hla3_uexon_part
 Select Count(*) 
     From hla3_uexon_part2
+
+Select ep.*
+        ,ue.uexon_seq
+    from hla3_uexon_part ep
+        inner join hla3_uexon ue on ue.uexon_iid=ep.uexon_iid
+    where ep.uexon_iid<10
+    order by ep.uexon_iid,ep.epart_pos
+
 
 Select ep.*
         ,ue.uexon_seq

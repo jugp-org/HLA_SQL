@@ -80,6 +80,10 @@ Begin
         Set uexon_seq	= REVERSE(uexon_seq)
         Where k_forward_back = 2
 
+    --Select * 
+    --    From hla3_uexon   
+    --    Order By uexon_uid  
+
 	-- Заменили на комплиментарную
     -- A->1->T
     -- T->2->A
@@ -88,6 +92,10 @@ Begin
     Update hla3_uexon
         Set uexon_seq	= Replace(Replace(Replace(Replace(Replace(Replace(Replace(Replace(uexon_seq,'A','1'),'T','2'),'C','3'),'G','4'),'1','T'),'2','A'),'3','G'),'4','C')
         Where k_forward_back = 2
+
+    --Select * 
+    --    From hla3_uexon   
+    --    Order By uexon_uid  
 
     -- ==================================================
     -- Длина 
