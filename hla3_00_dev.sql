@@ -8,6 +8,8 @@ Select a.*
     Order By a.allele_name
 
 Select a.allele_name
+        ,a.hla_g_group
+        ,a.hla_p_group
         ,f.*
     From hla3_alleles a
     Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid
@@ -62,7 +64,7 @@ Select *
     Order By uexon_iid
 
 -- Список уникальных экзонов 
--- в привязке к исзодным данным
+-- в привязке к исходным данным
 Select a.allele_name
         ,a.hla_g_group
         ,a.hla_p_group
@@ -74,7 +76,7 @@ Select a.allele_name
     Where 1=1
         --And a.allele_name Like 'HLA-A*%'
         --And ue.uexon_num=3
-        And ue.uexon_half_iid=15262
+        -- And ue.uexon_half_iid=15262
     Order By 
         a.allele_name
         ,f.feature_name
@@ -95,7 +97,7 @@ Select a.allele_name
     From hla3_uexon ue
         Inner Join _cte_dbl t On t.uexon_uid=ue.uexon_uid
         Inner Join hla3_features f With (Nolock) On f.feature_nucsequence=ue.uexon_seq
-        Inner Join hla3_alleles a With (Nolock) On a.allele_id=f.allele_id And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
+        Inner Join hla3_alleles a With (Nolock) On a.allele_iid=f.allele_iid And a.allele_name Like 'HLA-'+ue.gen_cd+'*%'
     Order By 
         ue.uexon_iid
         ,a.allele_name
