@@ -97,29 +97,36 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 -- ****************************************************************************************************
 -- Hla3
 -- ****************************************************************************************************
-	-- Список экзонов с 
+    -- ==================================================
+	-- Список экзонов 
+    -- ==================================================
 	Select a.allele_name
 		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
 		,a.hla_g_group
         ,a.allele_id
+        ,ue.uexon_uid
+        ,ue.uexon_diff_seq
 		,f.*
 	From hla3_features f With (Nolock)
- 		Inner Join hla3_alleles a With (Nolock)
-				On a.allele_iid = f.allele_iid
+ 		Inner Join hla3_alleles a With (Nolock) On a.allele_iid = f.allele_iid
+ 		Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
 	Where 1=1
  		--and (
  		--	(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
  		--	or
  		--	(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
  		--)
- 		--And a.allele_name='HLA-G*01:01:04'	
- 		And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCGG'
+ 		--And a.allele_name In ('HLA-C*06:116N') 
+        And a.hla_g_group In ('C*06:02:01G')
+ 		--And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCGG'
  		--And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCG*'
- 		-- And f.feature_nucsequence Like '%CACGTTTCCTGTGGCAGCCTAAGAGGGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGACAGATACTTCTATAATCAGGAGGAGTCCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGACGCTGAGTACTGGAACAGCCAGAAGGACATCCTGGAGCAGGCGCGGGCCGCGGTGGACACCTACTGCAGACACAACTACGGGGTTGGTG________________________%'
+ 		--And f.feature_nucsequence Like '%CACGTTTCCTGTGGCAGCCTAAGAGGGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGACAGATACTTCTATAATCAGGAGGAGTCCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGACGCTGAGTACTGGAACAGCCAGAAGGACATCCTGGAGCAGGCGCGGGCCGCGGTGGACACCTACTGCAGACACAACTACGGGGTTGGTG________________________%'
 	Order By f.feature_name, a.allele_name  
 
 
+    -- ==================================================
 	-- Список экзонов с [*]
+    -- ==================================================
 	Select a.allele_name
 		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
 		,f.*
@@ -136,7 +143,9 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
  		And Replace(f.feature_nucsequence,'*','')=''
 	Order By f.feature_name, a.allele_name  
 
+    -- ==================================================
 	-- Совпадение экзонов с [*] с любыми другими по маске
+    -- ==================================================
 	;With _cte_aster As (
 			Select a.allele_name
 				,a.allele_iid
@@ -176,6 +185,49 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 				On a.allele_iid = t.allele_iid
 		inner Join _cte_uexon f with (NoLock) On f.feature_nucsequence Like t.feature_nucsequence  
 	Order By t.feature_name, t.allele_name  
+
+    -- ==================================================
+    -- Список похожих последовательностей
+    -- ==================================================
+    If Object_id('tempdb..#_lst_uexon') is Not null
+        Drop table #_lst_uexon
+    If Object_id('tempdb..#_dbl_uexon') is Not null
+        Drop table #_dbl_uexon
+
+    --Select Max(Len(uexon_seq))
+    --    From hla3_uexon 
+
+    Select *
+        ,uexon_sseq = Cast(Substring(uexon_seq,1,500) As Varchar(500))
+        into #_lst_uexon
+        From hla3_uexon
+    
+    Create Nonclustered Index [_tmp_uexon_idx1] On [#_lst_uexon](uexon_num,uexon_sseq,uexon_uid)
+
+    Select 
+            uexon_uid1  = ue1.uexon_uid
+            ,uexon_uid2 = ue2.uexon_uid
+            ,uexon_seq1 = ue1.uexon_sseq
+            ,uexon_seq2 = ue2.uexon_sseq
+        Into #_dbl_uexon
+        From [#_lst_uexon] ue1
+        Inner Join [#_lst_uexon] ue2 
+            On ue1.uexon_num=ue2.uexon_num 
+               and ue1.uexon_sseq Like ue2.uexon_sseq+'%'
+               And ue1.uexon_uid<>ue2.uexon_uid
+    Select * 
+        From #_dbl_uexon        
+
+
+
+
+
+
+
+
+
+
+
 	
  -- ****************************************************************************************************
  -- Экзоны
