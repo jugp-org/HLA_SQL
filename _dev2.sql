@@ -188,6 +188,7 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 
     -- ==================================================
     -- Список похожих последовательностей
+    -- Одна длиннее - другая короче и... совпадают :)
     -- ==================================================
     If Object_id('tempdb..#_lst_uexon') is Not null
         Drop table #_lst_uexon
@@ -219,15 +220,109 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         From #_dbl_uexon        
 
 
+    -- ==================================================
+    -- Список аллелей класса I с экзонами
+    -- ==================================================
+    If Object_id('tempdb..#_allele') is Not null
+        Drop table #_allele
+    If Object_id('tempdb..#_allele1') is Not null
+        Drop table #_allele1
+
+    ;With _cte2 As (
+        Select a.*
+                ,exon2_uid  = ue.uexon_uid
+            From hla3_alleles a
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 2'
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
+            Where Substring(a.allele_name,1,5) In ('HLA-A','HLA-B','HLA-C')
+    ), _cte3 as (
+        Select a.*
+                ,exon3_uid  = ue.uexon_uid
+            From hla3_alleles a
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 3'
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
+            Where Substring(a.allele_name,1,5) In ('HLA-A','HLA-B','HLA-C')
+    )
+    Select Distinct
+            --allele_iid      = t2.allele_iid 
+             allele_name    = case when t2.hla_g_group='None' then Replace(t2.allele_name,'HLA-','') Else t2.hla_g_group End 
+            ,allele_g_group = t2.hla_g_group
+            ,exon2_uid      = t2.exon2_uid
+            ,exon3_uid      = t3.exon3_uid
+            Into #_allele
+        From _cte2 t2
+            Inner Join _cte3 t3 On t2.allele_iid=t3.allele_iid
+        Order By allele_name
+
+    Select *
+        From #_allele
+    Create Index _tmp_allele On #_allele(exon2_uid)
+    Create Index _tmp_allele1 On #_allele(exon3_uid)
+
+/*
+    -- ==================================================
+    11020	HLA-C*07:27:01	    None	        4981	10014      a1
+    10924	HLA-C*07:19	        None	        4940	10234      a3
+    -- ==================================================
+    10624	HLA-C*07:01:01:01	C*07:01:01G	    4940	10014      a4
+    10700	HLA-C*07:02:01:01	C*07:02:01G	    4981	10234      a2
+    -- ==================================================
+*/
+    Select   a1_name    = a1.allele_name
+            ,a1_ex2     = a1.exon2_uid
+            ,a1_ex3     = a1.exon3_uid
+            ,a2_name    = a2.allele_name
+            ,a2_ex2     = a2.exon2_uid
+            ,a2_ex3     = a2.exon3_uid
+            ,a3_name    = a3.allele_name
+            ,a3_ex2     = a3.exon2_uid
+            ,a3_ex3     = a3.exon3_uid
+            ,a4_name    = a4.allele_name
+            ,a4_ex2     = a4.exon2_uid
+            ,a4_ex3     = a4.exon3_uid
+        Into  #_allele1
+        From #_allele a1
+            Inner Join #_allele a2 On a2.exon2_uid=a1.exon2_uid And a2.exon3_uid<>a1.exon3_uid
+            Inner Join #_allele a3 On a3.exon2_uid<>a2.exon2_uid And a3.exon3_uid=a2.exon3_uid
+            Inner Join #_allele a4 On a4.exon2_uid=a3.exon2_uid And a4.exon3_uid<>a3.exon3_uid And a4.exon3_uid=a1.exon3_uid
+        Where 1=1
+--            and a1.allele_name Like 'C*%'
+            and a1.allele_name<>a2.allele_name
+            and a1.allele_name<>a3.allele_name
+            and a1.allele_name<>a4.allele_name
+            and a2.allele_name<>a3.allele_name
+            and a2.allele_name<>a4.allele_name
+            and a3.allele_name<>a4.allele_name
+        Order By a1.allele_name
+
+    -- Полный список
+    Select t1.*
+        From #_allele1 t1
+
+    -- Список уникальных
+    Select   a1_name    
+            ,a1_ex2     
+            ,a1_ex3     
+
+            ,a3_name    
+            ,a3_ex2     
+            ,a3_ex3     
+
+            ,a2_name    
+            ,a2_ex2     
+            ,a2_ex3     
+
+            ,a4_name    
+            ,a4_ex2     
+            ,a4_ex3     
+        From #_allele1 t1
+        Where t1.a1_name < t1.a3_name
+        order by t1.a1_name,t1.a2_name,t1.a3_name,t1.a4_name
 
 
-
-
-
-
-
-
-
+-- ****************************************************************************************************
+-- Hla2
+-- ****************************************************************************************************
 	
  -- ****************************************************************************************************
  -- Экзоны
