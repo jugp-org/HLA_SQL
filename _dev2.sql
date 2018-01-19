@@ -221,26 +221,30 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
 
 
     -- ==================================================
-    -- Список аллелей класса I с экзонами
+    -- Список вариантов
     -- ==================================================
     If Object_id('tempdb..#_allele') is Not null
         Drop table #_allele
     If Object_id('tempdb..#_allele1') is Not null
         Drop table #_allele1
+    If Object_id('tempdb..#_allele4_1') is Not null
+        Drop table #_allele4_1
+    If Object_id('tempdb..#_allele4_2') is Not null
+        Drop table #_allele4_2
 
     ;With _cte2 As (
         Select a.*
                 ,exon2_uid  = ue.uexon_uid
             From hla3_alleles a
                 Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 2'
-                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',a.allele_name)>0
             Where Substring(a.allele_name,1,5) In ('HLA-A','HLA-B','HLA-C')
     ), _cte3 as (
         Select a.*
                 ,exon3_uid  = ue.uexon_uid
             From hla3_alleles a
                 Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 3'
-                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',a.allele_name)>0
             Where Substring(a.allele_name,1,5) In ('HLA-A','HLA-B','HLA-C')
     )
     Select Distinct
@@ -254,8 +258,8 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
             Inner Join _cte3 t3 On t2.allele_iid=t3.allele_iid
         Order By allele_name
 
-    Select *
-        From #_allele
+    --Select *
+    --    From #_allele
     Create Index _tmp_allele On #_allele(exon2_uid)
     Create Index _tmp_allele1 On #_allele(exon3_uid)
 
@@ -268,7 +272,8 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     10700	HLA-C*07:02:01:01	C*07:02:01G	    4981	10234      a2
     -- ==================================================
 */
-    Select   a1_name    = a1.allele_name
+    Select  row_id      = Row_number() Over(Order By a1.allele_name,a2.allele_name,a3.allele_name,a4.allele_name)
+            ,a1_name    = a1.allele_name
             ,a1_ex2     = a1.exon2_uid
             ,a1_ex3     = a1.exon3_uid
             ,a2_name    = a2.allele_name
@@ -296,11 +301,12 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         Order By a1.allele_name
 
     -- Полный список
-    Select t1.*
-        From #_allele1 t1
+    --Select t1.*
+    --    From #_allele1 t1
 
     -- Список уникальных
-    Select   a1_name    
+    Select  row_id
+            ,a1_name    
             ,a1_ex2     
             ,a1_ex3     
 
@@ -318,6 +324,140 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
         From #_allele1 t1
         Where t1.a1_name < t1.a3_name
         order by t1.a1_name,t1.a2_name,t1.a3_name,t1.a4_name
+
+    -- ==================================================
+    -- Обработка 4 экзона
+    -- ==================================================
+    -- Экзоны с данными
+    Select distinct row_id
+            ,a_type = 1
+            ,a_ex4  = ue.uexon_uid
+        Into #_allele4_1
+        From #_allele1 t
+            Inner Join hla3_alleles a On t.a1_name=Case when charindex('G',t.a1_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+            Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',t.a1_name)>0
+        Where t.a1_name < t.a3_name
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 3
+                ,a_ex4  = ue.uexon_uid
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a3_name=Case when charindex('G',t.a3_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',t.a3_name)>0
+            Where t.a1_name < t.a3_name
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 2
+                ,a_ex4  = ue.uexon_uid
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a2_name=Case when charindex('G',t.a2_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',t.a2_name)>0
+            Where t.a1_name < t.a3_name
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 4
+                ,a_ex4  = ue.uexon_uid
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a4_name=Case when charindex('G',t.a4_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+                Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',t.a4_name)>0
+            Where t.a1_name < t.a3_name
+
+    -- Звездочки
+    Insert #_allele4_1
+    Select distinct row_id
+            ,a_type = 1
+            ,a_ex4  = -1
+        From #_allele1 t
+            Inner Join hla3_alleles a On t.a1_name=Case when charindex('G',t.a1_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+            Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+        Where t.a1_name < t.a3_name
+            And Replace(f.feature_nucsequence,'*','')=''
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 3
+                ,a_ex4  = -1
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a3_name=Case when charindex('G',t.a3_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            Where t.a1_name < t.a3_name
+                And Replace(f.feature_nucsequence,'*','')=''
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 2
+                ,a_ex4  = -1
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a2_name=Case when charindex('G',t.a2_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            Where t.a1_name < t.a3_name
+                And Replace(f.feature_nucsequence,'*','')=''
+
+    Insert #_allele4_1
+        Select distinct row_id
+                ,a_type = 4
+                ,a_ex4  = -1
+            From #_allele1 t
+                Inner Join hla3_alleles a On t.a4_name=Case when charindex('G',t.a4_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+                Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            Where t.a1_name < t.a3_name
+                And Replace(f.feature_nucsequence,'*','')=''
+    -- Индекс
+    Create Index tmp_allele4_1_idx1 On #_allele4_1(row_id,a_ex4,a_type)
+
+    -- Выборки
+    Select t1.*
+            ,t2.*
+            ,t3.*
+            ,t4.*
+        From #_allele4_1 t1
+            inner Join #_allele4_1 t2 On t2.row_id=t1.row_id And t2.a_type=2 And (t2.a_ex4=t1.a_ex4 Or t2.a_ex4=-1)
+            inner Join #_allele4_1 t3 On t3.row_id=t1.row_id And t3.a_type=3 And (t3.a_ex4=t1.a_ex4 Or t3.a_ex4=-1)
+            inner Join #_allele4_1 t4 On t4.row_id=t1.row_id And t4.a_type=4 And (t4.a_ex4=t1.a_ex4 Or t4.a_ex4=-1)
+        Where t1.a_type=1
+        Order By t1.row_id
+
+    Select t1.*
+        From #_allele4_1 t1
+        Where 1=1
+           And t1.row_id=1
+        Order By t1.row_id
+
+    Select *
+        From #_allele1 t1      
+        Where 1=1
+           And t1.row_id=1
+
+    Select a.*
+        From #_allele1 t
+            Inner Join hla3_alleles a On t.a2_name=Case when charindex('G',t.a2_name)>0 Then a.hla_g_group Else Replace(a.allele_name,'HLA-','') end
+            Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence And Charindex(ue.gen_cd+'*',t.a2_name)>0
+        Where t.row_id=1
+
+
+    Select a.*
+            ,f.*
+        From hla3_alleles a 
+            Inner Join hla3_features f With (Nolock) On f.allele_iid=a.allele_iid And f.feature_name='Exon 4'
+            --Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
+        Where Replace(f.feature_nucsequence,'*','')=''
+
+        ************************************************************************************************************************************************************************************************************************************************************************************
+
+
+
+
+
+
+
 
 
 -- ****************************************************************************************************
