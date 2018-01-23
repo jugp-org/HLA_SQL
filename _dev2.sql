@@ -129,10 +129,113 @@ Select @tsid = Cast((@tid % 4) As Varchar(1))
     -- ==================================================
 	Select 
         ue.*
-	From hla3_uexon ue With (Nolock) 
+	    From hla3_uexon ue With (Nolock) 
 	Where 1=1
+        and ue.k_forward_back=1
  		and ue.uexon_num=2
         And ue.gen_cd='B'
+
+    -- ==================================================
+    -- Тест выравнивания
+    -- Тест расчета расстояния
+    -- ==================================================
+    Select *
+        From hla3_fexon_align
+
+    Select @exon_seq=exon_seq
+        From hla3_fexon_align
+        Where gen_cd='B'
+        And exon_num=1
+    -- 'GCTCCCACTCCATGAGGTATTTCTACACCTCCGTGTCCCGGCCCGGCCGCGGGGAGCCCCGCTTCATCTCAGTGGGCTACGTGGACGACACCCAGTTCGTGAGGTTCGACAGCGACGCCGCGAGTCCGAGAGAGGAGCCGCGGGCGCCGTGGATAGAGCAGGAGGGGCCGGAGTATTGGGACCGGAACACACAGATCTACAAGGCCCAGGCACAGACTGACCGAGAGAGCCTGCGGAACCTGCGCGGCTACTACAACCAGAGCGAGGCCG'
+    Select dist_val = dbo.sql_str_distance(ue.uexon_seq,@exon_seq)
+            ,dbo.sql_str_rank_sdiff(ue.uexon_seq,@exon_seq)
+            From dna2_hla.dbo.hla3_uexon ue With (Nolock) 
+            Where 1=1
+                And ue.k_forward_back   = 1
+                And ue.gen_cd           = 'B'
+                And ue.uexon_num        = 2
+        Order By dist_val
+
+    -- ==================================================
+    -- Тест выравнивания
+    -- ==================================================
+    Declare  @fexon_iid     Int
+            ,@all_name      varchar(50)
+            ,@gen_cd        varchar(50)
+            ,@exon_name     varchar(50)
+            ,@exon_seq      Varchar(Max)
+            ,@exon_len      Int
+            ,@exon_Num      Int
+
+    If Object_id('tempdb..#_lst_uexon') is Not null
+        Drop table #_lst_uexon
+    Select ue.*
+        ,dist_val   = cast(0 As Numeric(10))
+        Into #_lst_uexon
+        From hla3_uexon ue
+
+    -- Цикл по родительским экзонам
+    Select @fexon_iid=Min(fexon_iid)
+        From [hla3_fexon_align]
+
+    While Isnull(@fexon_iid,0)<>0
+    Begin
+        Select @all_name    = t.allele_name
+              ,@exon_num    = t.exon_num
+              ,@exon_seq    = t.exon_seq
+              ,@gen_cd      = t.gen_cd
+              ,@exon_len    = t.exon_len
+            From [hla3_fexon_align] t
+            Where fexon_iid=@fexon_iid
+            
+        Print '*** Обработка:'+@all_name+' exon='+cast(@exon_num As Varchar(3))+' len='+cast(@exon_len As Varchar(5))+' seq='+@exon_seq
+
+        -- Список аллелей для каждого экзона, пронумерованных по порядку
+        Update #_lst_uexon
+            Set 
+                dist_val = dbo.sql_str_distance(ue.uexon_seq,@exon_seq)
+            From #_lst_uexon ue With (Nolock) 
+            Where 1=1
+                And ue.k_forward_back   = 1
+                And ue.gen_cd           = @gen_cd
+                And ue.uexon_num        = @exon_num
+
+    	-- Продолжить цикл
+        Select @fexon_iid=Min(fexon_iid)
+            From [hla3_fexon_align]
+            Where fexon_iid>@fexon_iid
+        -- Break
+    End
+
+    Select gen_cd, uexon_num, dist_val, Count(*)
+        From  #_lst_uexon ue
+        Where 1=1
+            And ue.k_forward_back   = 1
+        Group By gen_cd, uexon_num, dist_val
+        Order By gen_cd, uexon_num, dist_val
+
+    Select *
+        From  #_lst_uexon
+        Where gen_cd='A'
+            And uexon_num=2
+            And dist_val=0
+
+        Group By gen_cd, uexon_num, dist_val
+        Order By gen_cd, uexon_num, dist_val
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     -- ====================================================================================================
