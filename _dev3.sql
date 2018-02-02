@@ -50,7 +50,6 @@
         From hla3_fexon_align fa
         Order By fa.gen_cd,fa.exon_num
 
-
     -- ==================================================
 	-- Список длин уникальных  экзонов 
     -- ==================================================
@@ -185,19 +184,20 @@
 	-- Список экзонов с [*]
     -- ====================================================================================================
 	Select a.allele_name
-		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+		,gen_name	= Substring(a.allele_name,1,Charindex('*',a.allele_name))
 		,f.*
 	From hla3_features f With (Nolock)
  		Inner Join hla3_alleles a With (Nolock)
 				On a.allele_iid = f.allele_iid
 	Where 1=1
- 		and (
- 			(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
- 			or
- 			(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
- 			)
+ 		--and (
+ 		--	(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
+ 		--	or
+ 		--	(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
+ 		--	)
  		And Charindex('*',f.feature_nucsequence)>0
  		And Replace(f.feature_nucsequence,'*','')=''
+ 		And a.allele_name like '%DPB1*04:01:01:01%'
 	Order By f.feature_name, a.allele_name  
 
     -- ====================================================================================================
