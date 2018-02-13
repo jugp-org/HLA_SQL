@@ -5,7 +5,9 @@ Truncate Table [hla3_alleles]
 Truncate Table [hla3_features]
 
 -- ==================================================
--- 
+-- ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/Alignments_Rel_3310.zip
+-- или
+-- ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/alignments/
 -- ==================================================
 Declare @fmt_file    Varchar(250)
 Select @fmt_file    = 'C:\WORK\PROJECT\HLA_PROJ\NGS_DATA\ftp_data\_nuc.fmt'
