@@ -6,6 +6,19 @@
 -- Hla3
 -- ****************************************************************************************************
     -- ==================================================
+	-- Список аллелей 
+    -- ==================================================
+	Select a.allele_name
+		,Substring(a.allele_name,1,Charindex('*',a.allele_name))
+		,a.hla_g_group
+        ,a.allele_id
+	From hla3_alleles a With (Nolock) 
+	Where 1=1
+        And a.hla_g_group In ('A*02:01:01G')
+	Order By a.allele_name  
+
+
+    -- ==================================================
 	-- Список экзонов 
     -- ==================================================
 	Select a.allele_name
@@ -19,13 +32,14 @@
  		Inner Join hla3_alleles a With (Nolock) On a.allele_iid = f.allele_iid
  		Inner Join hla3_uexon ue With (Nolock) On ue.uexon_seq=f.feature_nucsequence
 	Where 1=1
+ 		and f.feature_name In ('Exon 2')
  		--and (
  		--	(f.feature_name In ('Exon 2', 'Exon 3') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=6)
  		--	or
  		--	(f.feature_name In ('Exon 2') And Len(Substring(a.allele_name,1,Charindex('*',a.allele_name)))=9)
  		--)
  		--And a.allele_name In ('HLA-C*06:116N') 
-        And a.hla_g_group In ('C*06:02:01G')
+        And a.hla_g_group In ('A*02:01:01G')
  		--And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCGG'
  		--And f.feature_nucsequence='GTTCTCACACCCTCCAGTGGATGATTGGCTGCGACCTGGGGTCCGACGGACGCCTCCTCCGCGGGTATGAACAGTATGCCTACGATGGCAAGGATTACCTCGCCCTGAACGAGGACCTGCGCTCCTGGACCGCAGCGGACACTGCGGCTCAGATCTCCAAGCGCAAGTGTGAGGCGGCCAATGTGGCTGAACAAAGGAGAGCCTACCTGGAGGGCACGTGCGTGGAGTGGCTCCACAGATACCTGGAGAACGGGAAGGAGATGCTGCAGCGCGCG*'
  		--And f.feature_nucsequence Like '%CACGTTTCCTGTGGCAGCCTAAGAGGGAGTGTCATTTCTTCAATGGGACGGAGCGGGTGCGGTTCCTGGACAGATACTTCTATAATCAGGAGGAGTCCGTGCGCTTCGACAGCGACGTGGGGGAGTTCCGGGCGGTGACGGAGCTGGGGCGGCCTGACGCTGAGTACTGGAACAGCCAGAAGGACATCCTGGAGCAGGCGCGGGCCGCGGTGGACACCTACTGCAGACACAACTACGGGGTTGGTG________________________%'
