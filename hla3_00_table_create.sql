@@ -181,24 +181,23 @@ GO
 	    [feature_name]				    varchar(30),
 	    [feature_status]			    varchar(10)	Null,
 
-	    --[feature_order]				    int,
+	    [seq_beg]	                    int	NULL,
+	    [seq_end]	                    int	NULL,
+	    [cDNA_beg]		                int	NULL,
+	    [cDNA_end]		                int	NULL,
 
-	    --[alignmentreference_alleleid]	varchar(30),
-	    --[alignmentreference_allelename]	varchar(30),
-	    --[SequenceCoordinates_start]	    int	NULL,
-	    --[SequenceCoordinates_end]	    int	NULL,
-
-	    --[cDNACoordinates_start]		    int	NULL,
-	    --[cDNACoordinates_end]		    int	NULL,
-
-	    --[cDNAindel_start]		        int	NULL,
-	    --[cDNAindel_end]		        int	NULL,
-	    --[cDNAindel_size]	            int	NULL,
-	    --[cDNAindel_type]	            Varchar(20)	Null,
+	    [cDNAindel_beg]		            int	NULL,
+	    [cDNAindel_end]		            int	NULL,
+	    [cDNAindel_size]	            int	NULL,
+	    [cDNAindel_type]	            Varchar(20)	Null,
 
 	    [feature_nucsequence]		    varchar(max) Null,
 	    [feature_len]		            Int	Null,
 	    [feature_diff_first]		    varchar(max) Null
+
+	    --[feature_order]				    int,
+	    --[alignmentreference_alleleid]	    varchar(30),
+	    --[alignmentreference_allelename]	varchar(30),
 
     ) 
 
@@ -350,10 +349,9 @@ GO
     -- Версия загруженных данных HLA.XML
     Create Table [dbo].[hla3_version]
     (
-	    [file_name]     Varchar(250)
-	   ,[file_create]  	datetime
-	   ,[file_size]  	Numeric(15)
-	   ,[file_loaded]   datetime
+	    [ver_num]           varchar(250)
+	   ,[ver_date]          varchar(50)
+	   ,[data_load_date]    dateTime
     )
     Go
     -- permissions

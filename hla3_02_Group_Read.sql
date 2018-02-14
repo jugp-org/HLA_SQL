@@ -19,7 +19,9 @@ Begin
     -- ==================================================
     -- 
     -- ==================================================
-    Declare @cSql  NVarchar(1024)
+    Declare @cSql       NVarchar(1024)
+    Declare @ver_Num    Varchar(250)
+    Declare @ver_Date   Varchar(250)
 
     -- ==================================================
     -- 
@@ -44,6 +46,26 @@ Begin
     Select @cSql = 'bulk insert #group_load from '''+@file_name+''' With (DATAFILETYPE = ''char'' ,FORMATFILE = '''+@fmt_name+''')  ';
     -- Select @cSql
     exec sp_executesql @cSql;
+
+    -- Прочитать номер версии
+    Select @ver_num=data_str
+        From #group_load
+        where Charindex('# version:',data_str)>0
+    Select @ver_date=data_str
+        From #group_load
+        where Charindex('# date:',data_str)>0
+
+    Select @ver_num=Replace(@ver_num,'# version: IPD-IMGT/HLA','')
+    Select @ver_num=Replace(@ver_num,' ','')
+    Select @ver_date=Replace(@ver_date,'# date:','')
+    Select @ver_date=Replace(@ver_date,' ','')
+
+    Delete 
+        from hla3_version
+    Insert [hla3_version]
+            ([ver_num],[ver_date],[data_load_date])
+        Values 
+            (@ver_num,@ver_date,Getdate())
 
     Delete 
         From #group_load
